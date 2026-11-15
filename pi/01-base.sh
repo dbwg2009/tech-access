@@ -36,7 +36,7 @@ apt-get update
 before=$(dpkg-query -W -f='${Package} ${Version}\n' | md5sum)
 DEBIAN_FRONTEND=noninteractive apt-get full-upgrade -y
 if [[ $before == "$(dpkg-query -W -f='${Package} ${Version}\n' | md5sum)" ]]; then ok "already up to date"; else changed "apt full-upgrade"; fi
-apt_install chrony git ca-certificates curl unzip openssl rsync
+apt_install chrony git ca-certificates curl unzip openssl rsync sqlite3
 
 say "chrony (RTC is the clock on the show network)"
 write_file /etc/chrony/conf.d/tech-access.conf 0644 root:root \
