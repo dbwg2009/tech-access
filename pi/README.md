@@ -14,7 +14,7 @@ Settings for all scripts are in [`config.env`](config.env) (committed, nothing s
 ## 1. Hardware
 
 1. Fit the active cooler, then the M.2 HAT+ with the NVMe SSD (ribbon cable into the PCIe port).
-2. Plug the RTC battery into the `BAT` connector (between the USB-C and micro-HDMI ports).
+2. Plug the RTC battery into the two-pin `BAT` connector next to the USB-C power port.
 3. No SD card needed.
 
 ## 2. Flash Raspberry Pi OS to the NVMe
