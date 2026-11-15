@@ -1,6 +1,6 @@
 # 3. Run the setup scripts
 
-[← Flash the Pi](02-flash-the-pi.md) · [Home](Home.md) · Next: [Show network →](04-show-network.md)
+[← Flash the Pi](Flash-the-Pi.md) · [Home](Home.md) · Next: [Show network →](Show-Network.md)
 
 The scripts in [`pi/`](../../pi) turn a freshly flashed Pi into the hub. Each one:
 
@@ -95,7 +95,7 @@ authority, so the Pi runs its own.
 
 | File | What | Notes |
 | --- | --- | --- |
-| `/etc/tech-access/ca/ca.key` | CA private key | **Never in git.** Back it up ([page 6](06-day-to-day.md#backups)). |
+| `/etc/tech-access/ca/ca.key` | CA private key | **Never in git.** Back it up ([page 6](Day-to-Day.md#backups)). |
 | `/etc/tech-access/ca/ca.crt` | CA certificate | Valid 20 years. |
 | `/etc/tech-access/tls/server.crt` + `.key` | Hub certificate | For `tech-hub`, `tech-hub.local`, `10.102.40.10`. Valid 825 days. |
 | `/etc/tech-access/tls/tech-access-ca.crt` | Copy of the CA cert | Goes into the iPad's profile in week 8. |

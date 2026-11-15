@@ -1,6 +1,6 @@
 # 4. Show network
 
-[← Setup scripts](03-setup-scripts.md) · [Home](Home.md) · Next: [The workbook →](05-workbook.md)
+[← Setup scripts](Setup-Scripts.md) · [Home](Home.md) · Next: [The workbook →](The-Workbook.md)
 
 ## Addresses
 

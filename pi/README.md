@@ -2,7 +2,7 @@
 
 Turn a Raspberry Pi 5 into the tech-access hub (`tech-hub`, 10.102.40.10).
 
-**Full instructions are in the [setup wiki](../docs/wiki/Home.md)**: hardware, flashing,
+**Full instructions are in the [setup wiki](https://github.com/dbwg2009/tech-access/wiki)** (source: [`docs/wiki/`](../docs/wiki)): hardware, flashing,
 what each script does, troubleshooting and rebuilding.
 
 | Script | Does | Internet? |

@@ -1,6 +1,6 @@
 # 5. The workbook
 
-[← Show network](04-show-network.md) · [Home](Home.md) · Next: [Day to day →](06-day-to-day.md)
+[← Show network](Show-Network.md) · [Home](Home.md) · Next: [Day to day →](Day-to-Day.md)
 
 People, fobs, kit and boxes are edited in a spreadsheet: the source-of-truth Claude Sheet linked
 in the [brief](../brief.md). The hub's database is the live copy. A workbook goes in through an

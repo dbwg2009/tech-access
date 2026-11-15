@@ -1,13 +1,13 @@
 # 8. Rebuild and handover
 
-[← Troubleshooting](07-troubleshooting.md) · [Home](Home.md)
+[← Troubleshooting](Troubleshooting.md) · [Home](Home.md)
 
 ## Rebuild from nothing
 
 If the Pi or its SSD dies:
 
-1. New hardware ([page 1](01-hardware.md)). Flash it ([page 2](02-flash-the-pi.md)) with hostname `tech-hub`.
-2. Run the scripts ([page 3](03-setup-scripts.md)), with one change: **restore the secrets
+1. New hardware ([page 1](Hardware.md)). Flash it ([page 2](Flash-the-Pi.md)) with hostname `tech-hub`.
+2. Run the scripts ([page 3](Setup-Scripts.md)), with one change: **restore the secrets
    before 03 and 04**, so the CA (trusted by the iPad) and box passwords stay the same:
 
    ```bash
@@ -16,14 +16,14 @@ If the Pi or its SSD dies:
 
    Then run `03`, `04` and `05`. They see the existing files and keep them. Then re-add each
    box's login with `sudo ./mqtt-add-box.sh <Box ID>`, which reuses the saved password.
-3. Restore the database ([page 6](06-day-to-day.md#restore-the-database)).
+3. Restore the database ([page 6](Day-to-Day.md#restore-the-database)).
 4. Check from the Nomad PC: `curl.exe http://10.102.40.10:8080/api/health`.
 
 Without a secrets backup it still works, but: the iPad needs the new CA profile (week 8+), and
 every box needs a new MQTT password (`mqtt-add-box.sh`).
 
 Without a database backup, import the latest workbook (a first import, see
-[page 5](05-workbook.md#the-very-first-import)). People, fobs, kit and boxes come back; the event
+[page 5](The-Workbook.md#the-very-first-import)). People, fobs, kit and boxes come back; the event
 log doesn't.
 
 ## Handover checklist

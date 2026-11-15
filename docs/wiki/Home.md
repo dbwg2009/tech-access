@@ -3,6 +3,9 @@
 How to build, run and look after the tech-access hub. Written for whoever has the job after
 Daniel, as well as for Daniel.
 
+> These pages live in the repo at `docs/wiki/` and are published to the GitHub Wiki on every
+> push to `main`. Edit them in the repo. Offline, read them in `/opt/tech-access/docs/wiki` on the Pi.
+
 **tech-access** controls who can take the school's tech kit. Crew tap an NFC fob, and lock boxes
 (mics, the Nomad key, keys, flight cases) open only for people at the right ladder level. It runs
 on a Raspberry Pi 5 on the show network, with **no internet**, and it is **never in the show
@@ -12,14 +15,14 @@ path**: if the hub dies mid-show, Eos, QLab and the WING carry on, and the boxes
 
 | # | Page | When you need it |
 | --- | --- | --- |
-| 1 | [Hardware](01-hardware.md) | Building the hub, or replacing a broken part |
-| 2 | [Flash the Pi](02-flash-the-pi.md) | New Pi, new SSD, or starting again from scratch |
-| 3 | [Run the setup scripts](03-setup-scripts.md) | After flashing; also to update or repair |
-| 4 | [Show network](04-show-network.md) | IP addresses, ports, what talks to what |
-| 5 | [The workbook](05-workbook.md) | Adding people, fobs, kit and boxes; the first import |
-| 6 | [Day to day](06-day-to-day.md) | Logs, restarts, box logins, updates, backups |
-| 7 | [Troubleshooting](07-troubleshooting.md) | Something's wrong |
-| 8 | [Rebuild and handover](08-rebuild-and-handover.md) | The Pi died; or you're taking this over |
+| 1 | [Hardware](Hardware.md) | Building the hub, or replacing a broken part |
+| 2 | [Flash the Pi](Flash-the-Pi.md) | New Pi, new SSD, or starting again from scratch |
+| 3 | [Run the setup scripts](Setup-Scripts.md) | After flashing; also to update or repair |
+| 4 | [Show network](Show-Network.md) | IP addresses, ports, what talks to what |
+| 5 | [The workbook](The-Workbook.md) | Adding people, fobs, kit and boxes; the first import |
+| 6 | [Day to day](Day-to-Day.md) | Logs, restarts, box logins, updates, backups |
+| 7 | [Troubleshooting](Troubleshooting.md) | Something's wrong |
+| 8 | [Rebuild and handover](Rebuild-and-Handover.md) | The Pi died; or you're taking this over |
 
 ## What exists so far (weeks 1–2)
 
@@ -32,7 +35,7 @@ path**: if the hub dies mid-show, Eos, QLab and the WING carry on, and the boxes
 | | Nomad agent, kit tags, more boxes (week 11+) |
 
 Until the panel exists, imports and exports are done with `curl` on the Pi
-([page 5](05-workbook.md)).
+([page 5](The-Workbook.md)).
 
 ## The short version
 

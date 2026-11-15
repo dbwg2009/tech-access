@@ -27,7 +27,7 @@ list linked from the [brief](../brief.md).
 4. Leave the SD slot empty.
 
 A Pi 5 with nothing bootable shows a boot screen on HDMI. That's normal until you flash it
-([page 2](02-flash-the-pi.md)).
+([page 2](Flash-the-Pi.md)).
 
 ## Things that matter later
 

@@ -1,6 +1,6 @@
 # 7. Troubleshooting
 
-[← Day to day](06-day-to-day.md) · [Home](Home.md) · Next: [Rebuild and handover →](08-rebuild-and-handover.md)
+[← Day to day](Day-to-Day.md) · [Home](Home.md) · Next: [Rebuild and handover →](Rebuild-and-Handover.md)
 
 **First, always:** re-run the script for that area (it's safe), and read
 `journalctl -u tech-access-hub -n 100`.
@@ -85,6 +85,6 @@ Day passes use the clock. A wrong date means passes show "expired" or "isn't val
 | `Required column "Status" is missing` | A header was renamed or deleted. |
 | `"..." is 7 hex digits` (Fob UID) | Leading zero lost: format the column as text and retype it. |
 | `Person ID P042 is not on the People sheet` | A fob points at someone missing from People. |
-| `No admin fob is set up yet` | First import: use an Active Admin fob from the file (see [page 5](05-workbook.md#the-very-first-import)). |
+| `No admin fob is set up yet` | First import: use an Active Admin fob from the file (see [page 5](The-Workbook.md#the-very-first-import)). |
 | `stale` | Data changed since the preview. Upload again. |
 | Lots of unexpected **removals** | You imported an old or partial file. **Don't apply.** Upload the right one. |

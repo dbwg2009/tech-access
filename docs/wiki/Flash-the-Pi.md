@@ -1,6 +1,6 @@
 # 2. Flash the Pi
 
-[← Home](Home.md) · Next: [Run the setup scripts →](03-setup-scripts.md)
+[← Home](Home.md) · Next: [Run the setup scripts →](Setup-Scripts.md)
 
 You need **internet once**, for flashing and setup: a home network or a phone hotspot. After that
 the Pi lives on the show network with none.
@@ -23,7 +23,7 @@ Raspberry Pi Imager there. Then fit the SSD in the HAT+.
 | OS | Raspberry Pi OS (other) → **Raspberry Pi OS Lite (64-bit)** (Trixie) |
 | Storage | The NVMe |
 | Hostname | `tech-hub` |
-| Username / password | Your own admin login. Write it in the handover notes ([page 8](08-rebuild-and-handover.md)). |
+| Username / password | Your own admin login. Write it in the handover notes ([page 8](Rebuild-and-Handover.md)). |
 | Wi-Fi | Your home Wi-Fi or a hotspot, country GB. This is the setup internet. |
 | Locale | Europe/London, keyboard `gb` |
 | SSH | On. A public key is best; a password is fine. |
@@ -34,7 +34,7 @@ Raspberry Pi Imager there. Then fit the SSD in the HAT+.
 2. Find it on the setup network: `ping tech-hub.local`, or look on your router.
 3. SSH in: `ssh <you>@tech-hub.local`
 
-If it doesn't boot from the NVMe, see [Troubleshooting](07-troubleshooting.md#pi-wont-boot-from-the-nvme).
+If it doesn't boot from the NVMe, see [Troubleshooting](Troubleshooting.md#pi-wont-boot-from-the-nvme).
 
 ### Setup internet over Wi-Fi or Ethernet?
 

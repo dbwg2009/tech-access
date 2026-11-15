@@ -1,6 +1,6 @@
 # 6. Day to day
 
-[← The workbook](05-workbook.md) · [Home](Home.md) · Next: [Troubleshooting →](07-troubleshooting.md)
+[← The workbook](The-Workbook.md) · [Home](Home.md) · Next: [Troubleshooting →](Troubleshooting.md)
 
 All of these are run on the Pi over SSH (`ssh <you>@tech-hub.local`, or `ssh <you>@10.102.40.10`
 on the show network).
