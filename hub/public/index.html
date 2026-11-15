@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>tech-access hub</title>
+<style>
+  body { margin: 0; min-height: 100vh; display: grid; place-items: center;
+         background: #111; color: #eee; font: 24px/1.4 system-ui, sans-serif; }
+  small { display: block; color: #999; font-size: 16px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>tech-access hub</h1>
+  <small id="status">Checking…</small>
+</main>
+<script>
+  fetch("/api/health").then(r => r.json()).then(h => {
+    document.getElementById("status").textContent =
+      `v${h.version} · schema ${h.schemaVersion} · db ${h.db} · up ${h.uptimeSeconds}s`;
+  }).catch(() => { document.getElementById("status").textContent = "Health check failed"; });
+</script>
+</body>
+</html>

@@ -32,3 +32,4 @@ pi/mosquitto/passwd
 .DS_Store
 Thumbs.db
 *.swp
+hub/data/
