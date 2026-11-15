@@ -1,20 +1,29 @@
 import { Hono } from "hono";
-import { serveStatic } from "hono/bun";
 import type { Database } from "bun:sqlite";
-import { resolve } from "node:path";
+import { extname, resolve, sep } from "node:path";
 import type { Config } from "./config";
 import { schemaVersion } from "./db";
+import { importRoutes } from "./routes/import";
 import { VERSION } from "./version";
 
 export interface AppDeps {
   db: Database;
   config: Config;
   startedAt?: number;
+  now?: () => Date;
 }
 
 const PUBLIC_DIR = resolve(import.meta.dir, "../public");
+const TYPES: Record<string, string> = {
+  ".html": "text/html; charset=utf-8",
+  ".css": "text/css; charset=utf-8",
+  ".js": "text/javascript; charset=utf-8",
+  ".svg": "image/svg+xml",
+  ".png": "image/png",
+  ".woff2": "font/woff2",
+};
 
-export function createApp({ db, config, startedAt = Date.now() }: AppDeps) {
+export function createApp({ db, config, startedAt = Date.now(), now = () => new Date() }: AppDeps) {
   const app = new Hono();
 
   app.get("/api/health", (c) => {
@@ -40,7 +49,18 @@ export function createApp({ db, config, startedAt = Date.now() }: AppDeps) {
     );
   });
 
-  app.use("/*", serveStatic({ root: PUBLIC_DIR, rewriteRequestPath: (p) => p }));
+  app.route("/api", importRoutes(db, config, now));
+  app.all("/api/*", (c) => c.json({ error: "Not found" }, 404));
+
+  // Local static files only. No CDN.
+  app.get("/*", async (c) => {
+    const rel = decodeURIComponent(new URL(c.req.url).pathname);
+    const path = resolve(PUBLIC_DIR, "." + (rel.endsWith("/") ? rel + "index.html" : rel));
+    if (path !== PUBLIC_DIR && !path.startsWith(PUBLIC_DIR + sep)) return c.notFound();
+    const file = Bun.file(path);
+    if (!(await file.exists())) return c.notFound();
+    return new Response(file, { headers: { "Content-Type": TYPES[extname(path)] ?? "application/octet-stream" } });
+  });
 
   return app;
 }
