@@ -1,0 +1,45 @@
+# Publishes docs/wiki/ to the repo's GitHub Wiki on every push to main.
+# One-off setup: open the Wiki tab on GitHub and save any first page, so the wiki's git repo
+# exists. After that, edit pages in docs/wiki/ only; the wiki is overwritten on each publish.
+name: Publish wiki
+
+on:
+  push:
+    branches: [main]
+    paths: ["docs/wiki/**", ".github/scripts/publish-wiki.sh", ".github/workflows/wiki.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: wiki
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Publish docs/wiki to the GitHub Wiki
+        env:
+          TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          git clone --quiet --depth 1 "https://x-access-token:${TOKEN}@github.com/${REPO}.git" src
+          if ! git clone --quiet "https://x-access-token:${TOKEN}@github.com/${REPO}.wiki.git" wiki; then
+            echo "::error::No wiki repo yet. Open the Wiki tab on GitHub, save a first page, then re-run this workflow."
+            exit 1
+          fi
+          src/.github/scripts/publish-wiki.sh src/docs/wiki wiki "https://github.com/${REPO}/blob/main"
+          cd wiki
+          if git diff --cached --quiet; then
+            echo "Wiki already up to date."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit --quiet -m "Publish docs/wiki from ${SHA::7}"
+          git push --quiet
+          echo "Published: https://github.com/${REPO}/wiki"
