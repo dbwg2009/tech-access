@@ -22,7 +22,6 @@ out/
 
 # Local config and secrets (examples are committed)
 hub/config.toml
-pi/config.env
 pi/mosquitto/passwd
 *.key
 *.pem
@@ -32,3 +31,4 @@ pi/mosquitto/passwd
 .DS_Store
 Thumbs.db
 *.swp
+hub/data/

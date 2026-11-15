@@ -47,8 +47,9 @@ The rest of the sheet is human help text. Ignore it on import; write it back unc
 | Header | Type | Rules |
 | --- | --- | --- |
 | Fob UID | text, required, unique | NTAG UID as hex. Normalise: uppercase, strip spaces, colons and dashes. 4, 7 or 10 bytes. Key. |
-| Person ID | text or blank | Must exist in People. Blank allowed only for `Spare` fobs. |
+| Person ID | text or blank | Must exist in People. Blank allowed only for `Spare` fobs and `Day pass` fobs (guests). |
 | Role | enum | `Standard`, `Admin`, `Day pass` |
+| Level | integer 1–4 or blank | Optional column. Only used for `Day pass` fobs: the fixed level the pass carries. Blank = 1. Ignored for other roles. |
 | Status | enum | `Active`, `Spare`, `Lost`, `Revoked` |
 | Issued | date or blank | |
 | Ended | date or blank | Set when Lost or Revoked. A Day pass ends at the end of the day it was issued. |

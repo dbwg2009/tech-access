@@ -1,0 +1,28 @@
+# Installed to /etc/systemd/system/ by 05-bun-hub.sh. @VARS@ are filled from pi/config.env.
+[Unit]
+Description=tech-access hub (API, importer, panel)
+After=network-online.target mosquitto.service
+Wants=network-online.target
+# Never give up restarting.
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+User=@HUB_USER@
+Group=@HUB_USER@
+WorkingDirectory=@INSTALL_DIR@/hub
+Environment=TECH_ACCESS_CONFIG=@ETC_DIR@/hub.toml
+EnvironmentFile=-@ETC_DIR@/hub.env
+ExecStart=/usr/local/bin/bun run src/server.ts
+Restart=always
+RestartSec=2
+
+# Hardening: the hub only writes its database.
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+ReadWritePaths=@DATA_DIR@
+
+[Install]
+WantedBy=multi-user.target

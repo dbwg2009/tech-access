@@ -1,0 +1,21 @@
+# tech-access hub config. Copy to config.toml (not committed) and edit.
+# Path can be overridden with TECH_ACCESS_CONFIG=/path/to/config.toml.
+
+# SQLite database file. Relative paths are relative to this config file.
+db_path = "data/tech-access.db"
+
+# HTTP port for the API and panel.
+http_port = 8080
+
+# Interface to bind. 0.0.0.0 = all (Nomad PC on the show network needs to reach /api/health).
+http_host = "0.0.0.0"
+
+# Mosquitto on the Pi. Credentials go in the env var TECH_ACCESS_MQTT_PASSWORD, not here.
+mqtt_url = "mqtt://127.0.0.1:1883"
+mqtt_username = "hub"
+
+# Where management USB sticks (TECHBACKUP, TECHUPDATE, TECHSOFTWARE) get mounted.
+usb_mount_root = "/media"
+
+# All local times (day pass expiry, export timestamps for humans).
+timezone = "Europe/London"

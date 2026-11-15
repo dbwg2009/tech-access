@@ -1,0 +1,9 @@
+# tech-access MQTT ACL. Installed to /etc/mosquitto/tech-access.acl by 03-mosquitto.sh.
+
+# The hub sees and sends everything.
+user hub
+topic readwrite #
+
+# Each box logs in with its Box ID as the username (e.g. BOX-01) and can only use
+# its own topics: box/BOX-01/... (heartbeat, taps, door state, commands, OTA).
+pattern readwrite box/%u/#
