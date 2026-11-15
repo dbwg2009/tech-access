@@ -1,5 +1,5 @@
 import type { Database } from "bun:sqlite";
-import { isAdmin } from "../access";
+import { adminCheck } from "../access";
 import { diff, diffRows, type Diff } from "./diff";
 import { localDate, normaliseUid } from "./normalise";
 import { parseWorkbook, type ParsedWorkbook } from "./parse";
@@ -91,17 +91,21 @@ function authorise(
     .query<Fob & { extra: string }, [string]>("SELECT * FROM fobs WHERE fob_uid = ? AND archived_at IS NULL")
     .get(fobUid);
   if (dbFob) {
-    return isAdmin(dbFob) ? { ok: true, fob: dbFob, bootstrap: false } : { ok: false, reason: "That fob isn't an active admin fob" };
+    const person = dbFob.person_id
+      ? db.query<Person, [string]>("SELECT * FROM people WHERE person_id = ? AND archived_at IS NULL").get(dbFob.person_id)
+      : null;
+    const d = adminCheck(dbFob, person);
+    return d.allow ? { ok: true, fob: dbFob, bootstrap: false } : { ok: false, reason: d.reason };
   }
   const anyAdmin = db
     .query("SELECT 1 FROM fobs WHERE role = 'Admin' AND status = 'Active' AND archived_at IS NULL LIMIT 1")
     .get();
   if (anyAdmin) return { ok: false, reason: "Unknown fob" };
   const f = parsed.rows.fobs.find((x) => x.fob_uid === fobUid);
-  if (!f || !isAdmin(f)) return { ok: false, reason: "No admin fob is set up yet; tap an Active Admin fob from this workbook" };
-  const p: Person | undefined = f.person_id ? parsed.rows.people.find((x) => x.person_id === f.person_id) : undefined;
-  if (f.person_id && p?.status !== "Active") return { ok: false, reason: "That admin fob's person isn't Active" };
-  return { ok: true, fob: f, bootstrap: true };
+  if (!f) return { ok: false, reason: "No admin fob is set up yet; tap an Active Admin fob from this workbook" };
+  const p = f.person_id ? (parsed.rows.people.find((x) => x.person_id === f.person_id) ?? null) : null;
+  const d = adminCheck(f, p);
+  return d.allow ? { ok: true, fob: f, bootstrap: true } : { ok: false, reason: d.reason };
 }
 
 /** Apply a pending batch in one transaction. Idempotent: a second apply of the same batch is a no-op. */

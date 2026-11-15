@@ -171,7 +171,7 @@ function crossChecks(p: ParsedWorkbook): void {
 
   for (const x of people) {
     const row = rn.people[x.person_id] ?? null;
-    if (x.type === "Student" && x.level === null) warn("People", row, "Level", `${x.name} is a student with no Level, so they can't open anything`);
+    if (x.type === "Student" && x.level === null) warn("People", row, "Level", `${x.name} is a student with no Level, so they can't open anything (new crew start at Level 1)`);
     if (x.type !== "Student" && x.level !== null) warn("People", row, "Level", `Level is ignored for ${x.type} (treated as Level 4)`);
   }
 

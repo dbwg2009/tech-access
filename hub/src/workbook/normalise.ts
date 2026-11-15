@@ -1,4 +1,7 @@
 import * as XLSX from "xlsx";
+import { localDate } from "../time";
+
+export { localDate };
 
 export type Result<T> = { ok: true; value: T } | { ok: false; error: string };
 const ok = <T>(value: T): Result<T> => ({ ok: true, value });
@@ -54,9 +57,7 @@ function isoDate(y: number, m: number, d: number): Result<string> {
 export function normaliseDate(v: unknown, timezone = "Europe/London"): Result<string> {
   if (v instanceof Date) {
     if (Number.isNaN(v.getTime())) return fail("invalid date");
-    const p = new Intl.DateTimeFormat("en-CA", { timeZone: timezone, year: "numeric", month: "2-digit", day: "2-digit" })
-      .format(v);
-    return ok(p);
+    return ok(localDate(v, timezone));
   }
   if (typeof v === "number") {
     const c = XLSX.SSF.parse_date_code(v);
@@ -80,11 +81,6 @@ export function normaliseIpv4(v: unknown): Result<string> {
   return fail(`"${s}" is not an IPv4 address`);
 }
 
-/** Today's date in the given timezone as YYYY-MM-DD. */
-export function localDate(now: Date, timezone = "Europe/London"): string {
-  return new Intl.DateTimeFormat("en-CA", { timeZone: timezone, year: "numeric", month: "2-digit", day: "2-digit" })
-    .format(now);
-}
 
 /** YYYY-MM-DD -> Excel serial (1900 date system). */
 export function dateToSerial(iso: string): number {
