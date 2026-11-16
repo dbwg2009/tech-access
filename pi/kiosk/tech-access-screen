@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+# tech-access-screen on|off: switch the panel's screen and tell the hub, so the page knows to
+# swallow the touch that wakes it (wake guard). Called by swayidle (06-kiosk.sh).
+set -u
+. "${TECH_ACCESS_KIOSK_ENV:-/etc/tech-access/kiosk.env}"
+case ${1:-} in
+  on) wlopm --on '*'; s=true ;;
+  off) wlopm --off '*'; s=false ;;
+  *) echo "usage: $0 on|off" >&2; exit 2 ;;
+esac
+curl -s -m 2 -X POST -H 'Content-Type: application/json' -d "{\"on\":$s}" "$HUB_URL/api/panel/screen" >/dev/null 2>&1 || true

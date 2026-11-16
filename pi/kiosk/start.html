@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en" translate="no">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1280, height=800, user-scalable=no">
+<title>Starting</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #0b0e13; color: #9aa6b4; cursor: none;
+               font: 40px/1.3 sans-serif; display: grid; place-items: center; user-select: none; }
+</style>
+</head>
+<body>
+<div id="m">Starting the desk panel…</div>
+<script>
+  // Installed by 06-kiosk.sh. Waits for the hub on this Pi, then opens the panel.
+  const HUB = "http://127.0.0.1:@HUB_PORT@";
+  let tries = 0;
+  async function check() {
+    try {
+      await fetch(HUB + "/api/health", { mode: "no-cors", cache: "no-store" });
+      location.replace(HUB + "/panel/?kiosk=1");
+    } catch {
+      tries++;
+      if (tries > 15) document.getElementById("m").textContent = "Waiting for the hub… (tell a staff member if this stays)";
+      setTimeout(check, 2000);
+    }
+  }
+  check();
+</script>
+</body>
+</html>

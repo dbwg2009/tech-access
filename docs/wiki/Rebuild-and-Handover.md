@@ -1,6 +1,6 @@
 # 8. Rebuild and handover
 
-[← Troubleshooting](Troubleshooting.md) · [Home](Home.md)
+[← Troubleshooting](Troubleshooting.md) · [Home](Home.md) · Next: [The desk panel →](Desk-Panel.md)
 
 ## Rebuild from nothing
 

@@ -31,7 +31,15 @@ export async function upload(path: string, file: File): Promise<Record<string, u
 /** Live events from GET /api/panel/stream. EventSource reconnects by itself. */
 export function stream(on: Record<string, (data: any) => void>, onOpen: () => void): EventSource {
   const es = new EventSource("/api/panel/stream");
-  for (const [name, fn] of Object.entries(on)) es.addEventListener(name, (e) => fn(JSON.parse((e as MessageEvent).data)));
+  let lost = false;
+  for (const [name, fn] of Object.entries(on)) {
+    es.addEventListener(name, (e) => {
+      // Back after the hub was away (restart or update): reload, so a new panel build is used.
+      if (name === "hello" && lost) return location.reload();
+      fn(JSON.parse((e as MessageEvent).data));
+    });
+  }
   es.addEventListener("open", onOpen);
+  es.addEventListener("error", () => (lost = true));
   return es;
 }

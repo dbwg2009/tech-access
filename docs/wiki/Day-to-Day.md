@@ -66,8 +66,10 @@ Updating the OS itself (with internet, not in show week): `sudo ./01-base.sh`, t
 
 ## Backups
 
-The TECHBACKUP stick (week 7) will do this with a tap. Until then, by hand. With a USB stick in
-the Pi:
+**On the panel:** admin fob → **Backup now** copies the database to `/var/lib/tech-access/backups/`
+on the Pi (the newest 14 are kept). That protects against a bad import, not against losing the
+SSD. The TECHBACKUP stick (week 7) will copy to a stick with a tap. Until then, to a stick by
+hand. With a USB stick in the Pi:
 
 ```bash
 lsblk                                  # find the stick, e.g. sda1

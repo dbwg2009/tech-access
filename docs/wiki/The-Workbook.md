@@ -41,10 +41,25 @@ Tips:
 TECHSOFTWARE updates (week 7) need an Admin fob, or a Standard fob of a Level 3+ student or a
 staff member. Reasons for every rule are in [decisions.md](../decisions.md).
 
-## Importing (until the panel exists)
+## Importing
 
-The panel (weeks 3–4) and the TECHUPDATE stick (week 7) will do this with a tap. For now, use
-`curl` **on the Pi**, because the admin routes only answer the Pi itself.
+**On the panel:** tap an admin fob → **Update from workbook** → choose the file → read the
+preview → **Apply**, then tap an admin fob to confirm ([page 9](Desk-Panel.md)). From week 7 the
+TECHUPDATE stick opens the preview by itself.
+
+### Changes made on the panel (conflicts)
+
+The admin menu changes the same data as the workbook (enrol, lost / revoke, day passes). The hub
+remembers every such change until the next **export**. If your workbook would undo one, the
+preview lists it as a **conflict** and you choose **Keep panel** (the default) or **Use
+workbook** for each. Apply is refused until every conflict has a choice.
+
+So: **after using the admin menu, export first, then edit that exported file.** An export marks
+every panel change as included, so re-importing it never conflicts.
+
+### With curl (on the Pi)
+
+The admin routes only answer the Pi itself.
 
 1. In the Claude Sheet: download as `.xlsx`.
 2. Copy it to the Pi: `scp tracker.xlsx <you>@tech-hub.local:`
@@ -71,6 +86,10 @@ The panel (weeks 3–4) and the TECHUPDATE stick (week 7) will do this with a ta
 
    You should get `{"kind":"applied",...}`. Applying the same batch twice does nothing the second time.
 
+   If the preview has `diff.conflicts`, add a choice for each conflict's `key`:
+   `-d '{"fobUid":"04A1B2C3D4E5F6","resolutions":{"fobs/04A1B2C3D4E5F7/Status":"panel"}}'`
+   (`"panel"` keeps the hub's value, `"sheet"` uses the workbook).
+
 ### The very first import
 
 An empty hub has no admin fob to tap. For the first import only, the hub accepts an **Active
@@ -90,6 +109,7 @@ an `Active` person (Daniel, Mrs Ritter, the sealed spare).
 | `forbidden` (403) | Not an Active Admin fob, unknown fob, or its owner isn't Active | Use an admin fob |
 | `superseded` (409) | A newer file was uploaded since | Apply the newer `batchId` |
 | `stale` (409) | The hub's data changed after this preview | Upload again for a fresh preview |
+| `unresolved` (409) | Conflicts with panel changes have no choice yet | Add `resolutions` (or choose on the panel) |
 
 ## Exporting
 
