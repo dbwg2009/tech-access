@@ -1,0 +1,13 @@
+{ "defaults":{"boot":{"clock":"2026-11-16T18:00:00.000Z","fobs":{"v":1,"ts":"2026-11-16T18:00:00.000Z","offline_unlock_min":5,"fobs":[{"uid":"04A1B2C3D4E5F6"},{"uid":"AABBCCDD","until":"2026-11-16"}]},"fw":"0.1.0","door_sensor":true}},
+  "cases": [
+    { "name": "heartbeat on connect, then every 30 s, only while connected",
+      "steps": [
+        {"at":0,"no_publish":["heartbeat"]},
+        {"at":5000,"broker":true,"publish":[{"topic":"heartbeat","match":{"fw":"0.1.0","uptime_s":5,"ts":"2026-11-16T18:00:05.000Z"}},{"topic":"state","match":{"lock":"locked"}}]},
+        {"at":34999,"no_publish":["heartbeat"]},
+        {"at":35000,"publish":[{"topic":"heartbeat","match":{"uptime_s":35}}]},
+        {"at":40000,"broker":false},
+        {"at":70000,"no_publish":["heartbeat"]}
+      ]}
+  ]
+}

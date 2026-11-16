@@ -1,0 +1,50 @@
+{ "defaults":{"boot":{"clock":"2026-11-16T18:00:00.000Z","fobs":{"v":1,"ts":"2026-11-16T18:00:00.000Z","offline_unlock_min":5,"fobs":[{"uid":"04A1B2C3D4E5F6"},{"uid":"AABBCCDD","until":"2026-11-16"}]},"fw":"0.1.0","door_sensor":true}},
+  "cases": [
+    { "name": "hub unreachable for offline_unlock_min unlocks with why offline; hub back locks again",
+      "steps": [ {"at":0,"broker":true},{"at":0,"msg":"hub","payload":{"online":true}},
+        {"at":1000,"broker":false,"expect":{"lock":"locked"}},
+        {"at":300999,"expect":{"lock":"locked"}},
+        {"at":301000,"expect":{"lock":"open","why":"offline"},"actions":["set_lock"]},
+        {"at":302000,"tap":"11223344","publish":[],"no_publish":["tap"]},
+        {"at":400000,"broker":true,"publish":[{"topic":"state","match":{"lock":"open","why":"offline"}}],"no_publish":["tap"]},
+        {"at":400001,"msg":"hub","payload":{"online":true},"expect":{"lock":"locked","why":""},"publish":[{"topic":"state","match":{"lock":"locked"}},
+                                                {"topic":"tap","match":{"uid":"11223344","result":"allow","reason":"offline","source":"offline"}}]}
+      ]},
+    { "name": "broker up but hub/status offline counts as hub unreachable",
+      "steps": [ {"at":0,"broker":true},{"at":0,"msg":"hub","payload":{"online":true}},
+        {"at":1000,"msg":"hub","payload":{"online":false}},
+        {"at":300999,"expect":{"lock":"locked"}},
+        {"at":301000,"expect":{"lock":"open","why":"offline"}},
+        {"at":302000,"msg":"hub","payload":{"online":true},"expect":{"lock":"locked"}}
+      ]},
+    { "name": "a box that boots with no hub uses its stored list, then unlocks after the timeout",
+      "steps": [
+        {"at":0,"expect":{"lock":"locked"}},
+        {"at":1000,"tap":"04A1B2C3D4E5F6","expect":{"lock":"open","why":"fob"}},
+        {"at":9000,"expect":{"lock":"locked"}},
+        {"at":300000,"expect":{"lock":"open","why":"offline"}}
+      ]},
+    { "name": "offline_unlock_min comes from the fobs list",
+      "boot": {"fobs":{"v":1,"offline_unlock_min":1,"fobs":[]}},
+      "steps": [ {"at":0,"broker":true},{"at":0,"msg":"hub","payload":{"online":true}},
+        {"at":1000,"broker":false},
+        {"at":60999,"expect":{"lock":"locked"}},
+        {"at":61000,"expect":{"lock":"open","why":"offline"}}
+      ]},
+    { "name": "offline_unlock_min 0 unlocks as soon as the hub is unreachable",
+      "boot": {"fobs":{"v":1,"offline_unlock_min":0,"fobs":[]}},
+      "steps": [ {"at":0,"broker":true},{"at":0,"msg":"hub","payload":{"online":true}},
+        {"at":1000,"expect":{"lock":"locked"}},
+        {"at":2000,"broker":false,"expect":{"lock":"open","why":"offline"}}
+      ]},
+    { "name": "a short drop doesn't unlock, and the timer restarts on the next drop",
+      "steps": [ {"at":0,"broker":true},{"at":0,"msg":"hub","payload":{"online":true}},
+        {"at":1000,"broker":false},
+        {"at":200000,"broker":true},
+        {"at":200000,"msg":"hub","payload":{"online":true}},
+        {"at":200001,"broker":false},
+        {"at":499999,"expect":{"lock":"locked"}},
+        {"at":500001,"expect":{"lock":"open","why":"offline"}}
+      ]}
+  ]
+}

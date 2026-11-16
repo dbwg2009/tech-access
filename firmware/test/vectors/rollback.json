@@ -1,0 +1,23 @@
+{ "defaults":{"boot":{"clock":"2026-11-16T18:00:00.000Z","fobs":{"v":1,"ts":"2026-11-16T18:00:00.000Z","offline_unlock_min":5,"fobs":[{"uid":"04A1B2C3D4E5F6"},{"uid":"AABBCCDD","until":"2026-11-16"}]},"fw":"0.1.0","door_sensor":true}},
+  "cases": [
+    { "name": "new firmware is marked valid after it connects and sends a heartbeat, and says so",
+      "boot": {"fw":"0.2.0","ota_pending_verify":true},
+      "steps": [
+        {"at":0,"no_actions":["mark_valid"]},
+        {"at":4000,"broker":true,"actions":["mark_valid"],"publish":[{"topic":"heartbeat","match":{"fw":"0.2.0"}},{"topic":"state","match":{"fw":"0.2.0","ota":"updated","ota_version":"0.2.0"}}]},
+        {"at":400000,"no_actions":["rollback"]}
+      ]},
+    { "name": "new firmware that never reaches the broker rolls back after 5 minutes",
+      "boot": {"fw":"0.2.0","ota_pending_verify":true},
+      "steps": [
+        {"at":299999,"no_actions":["rollback","mark_valid"]},
+        {"at":300000,"actions":["rollback"]}
+      ]},
+    { "name": "after a rollback the old firmware reports it once",
+      "boot": {"fw":"0.1.0","rolled_back_from":"0.2.0"},
+      "steps": [
+        {"at":1000,"broker":true,"publish":[{"topic":"state","match":{"fw":"0.1.0","ota":"rolled_back","ota_version":"0.2.0","ota_why":"*"}}]},
+        {"at":2000,"tap":"04A1B2C3D4E5F6","publish":[{"topic":"state","match":{"lock":"open"},"absent":["ota"]}]}
+      ]}
+  ]
+}

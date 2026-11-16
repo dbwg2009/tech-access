@@ -1,0 +1,30 @@
+{ "defaults":{"boot":{"clock":"2026-11-16T18:00:00.000Z","fobs":{"v":1,"ts":"2026-11-16T18:00:00.000Z","offline_unlock_min":5,"fobs":[{"uid":"04A1B2C3D4E5F6"},{"uid":"AABBCCDD","until":"2026-11-16"}]},"fw":"0.1.0","door_sensor":true}},
+  "cases": [
+    { "name": "show true keeps the box unlocked until show false",
+      "steps": [ {"at":0,"broker":true},{"at":0,"msg":"hub","payload":{"online":true}},
+        {"at":1000,"msg":"mode","payload":{"show":true,"ts":"2026-11-16T18:00:01.000Z"},"expect":{"lock":"open","why":"show"},
+         "publish":[{"topic":"state","match":{"lock":"open","why":"show"}}]},
+        {"at":600000,"expect":{"lock":"open","why":"show"}},
+        {"at":600001,"tap":"11223344","expect":{"lock":"open"},"publish":[{"topic":"tap","match":{"result":"allow","reason":"show"}}]},
+        {"at":700000,"msg":"mode","payload":{"show":false,"ts":"2026-11-16T18:11:40.000Z"},"expect":{"lock":"locked"}}
+      ]},
+    { "name": "a lock command doesn't end show mode (only mode show:false does)",
+      "steps": [ {"at":0,"broker":true},{"at":0,"msg":"hub","payload":{"online":true}},
+        {"at":1000,"msg":"mode","payload":{"show":true}},
+        {"at":2000,"msg":"cmd","payload":{"cmd":"lock","expires":"2026-11-16T18:00:17.000Z","ref":9},"expect":{"lock":"open","why":"show"},
+         "publish":[{"topic":"state","match":{"lock":"open","ref":9}}]},
+        {"at":2001,"msg":"mode","payload":{"show":false},"expect":{"lock":"locked","why":""}}
+      ]},
+    { "name": "an empty retained mode message means show off",
+      "steps": [ {"at":0,"broker":true},{"at":0,"msg":"hub","payload":{"online":true}},
+        {"at":1000,"msg":"mode","payload":{"show":true},"expect":{"lock":"open"}},
+        {"at":2000,"msg":"mode","payload":null,"expect":{"lock":"locked"}}
+      ]},
+    { "name": "a malformed mode message is ignored",
+      "steps": [ {"at":0,"broker":true},{"at":0,"msg":"hub","payload":{"online":true}},
+        {"at":1000,"msg":"mode","payload":{"show":true}},
+        {"at":2000,"msg":"mode","payload":"{not json","expect":{"lock":"open","why":"show"}},
+        {"at":3000,"msg":"mode","payload":{"show":"yes"},"expect":{"lock":"open","why":"show"}}
+      ]}
+  ]
+}
