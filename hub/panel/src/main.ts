@@ -20,6 +20,7 @@ interface SessionView {
   specialism?: string | null;
   type?: string;
   signedIn?: boolean;
+  canSignIn?: boolean;
   kitOut?: { kit_id: string; item: string }[];
 }
 
@@ -34,7 +35,6 @@ type View =
   | { v: "admin"; menu: Row | null }
   | { v: "students"; menu: Row | null }
   | { v: "enrol"; step: "tap" | "who" | "new"; uid: string | null; people: Row[] | null; draft: Row }
-  | { v: "fobs"; items: Row[] | null; sel: Row | null }
   | { v: "daypass"; step: "tap" | "form"; uid: string | null; guest: string; level: number }
   | { v: "show"; menu: Row | null }
   | { v: "force"; items: Row[] | null }
@@ -42,6 +42,10 @@ type View =
   | { v: "log"; data: Row | null; filters: Row | null; q: Record<string, string>; page: number }
   | { v: "status"; data: Row | null }
   | { v: "restart" }
+  | { v: "edit"; tab: "people" | "kit" | "boxes" | "spares"; q: string; items: Row[] | null }
+  | { v: "person"; id: string | null; draft: Row; fobs: Row[]; lostFobs: number; loaded: boolean; waitingFob: boolean }
+  | { v: "kitItem"; id: string | null; draft: Row; boxes: Row[] | null }
+  | { v: "box"; id: string | null; draft: Row }
   | { v: "import"; preview: Row | null; res: Record<string, "panel" | "sheet">; error: string | null };
 
 const S = {
@@ -92,7 +96,13 @@ function show(r: ApiResult): boolean {
 
 const sid = () => S.session?.id ?? "";
 
+const EDITOR_VIEWS = new Set(["edit", "person", "kitItem", "box"]);
+
 function go(view: View): void {
+  // In the editor a fob tap finds its owner instead of opening a new card.
+  const was = EDITOR_VIEWS.has(S.view.v);
+  const now = EDITOR_VIEWS.has(view.v);
+  if (was !== now && S.session?.kind === "admin") void post("/api/admin/edit/find", { session: sid(), on: now });
   S.view = view;
   render();
   void load();
@@ -126,9 +136,6 @@ async function load(): Promise<void> {
       case "enrol":
         if (v.step === "who" && !v.people) v.people = (await get<{ people: Row[] }>(`/api/admin/people?${q}`)).people;
         break;
-      case "fobs":
-        v.items = (await get<{ fobs: Row[] }>(`/api/admin/fobs?${q}`)).fobs;
-        break;
       case "force":
         v.items = (await get<{ kit: Row[] }>(`/api/admin/kit-out?${q}`)).kit;
         break;
@@ -143,6 +150,24 @@ async function load(): Promise<void> {
       }
       case "status":
         v.data = await get(`/api/admin/status?${q}`);
+        break;
+      case "edit": {
+        const path = v.tab === "people" ? `edit/people?${q}&q=${encodeURIComponent(v.q)}` : `edit/${v.tab}?${q}`;
+        const r = await get<Row>(`/api/admin/${path}`);
+        v.items = (r.people ?? r.kit ?? r.boxes ?? r.fobs) as Row[];
+        break;
+      }
+      case "person":
+        if (v.id) {
+          const r = await get<Row>(`/api/admin/edit/person?${q}&id=${encodeURIComponent(v.id)}`);
+          if (!v.loaded) v.draft = { ...r.person };
+          v.fobs = r.fobs;
+          v.lostFobs = r.lostFobs;
+          v.loaded = true;
+        }
+        break;
+      case "kitItem":
+        v.boxes = (await get<{ boxes: Row[] }>(`/api/admin/edit/boxes?${q}`)).boxes;
         break;
       default:
         return;
@@ -199,9 +224,6 @@ function render(): void {
     case "enrol":
       screen = enrol(v);
       break;
-    case "fobs":
-      screen = fobs(v);
-      break;
     case "daypass":
       screen = dayPass(v);
       break;
@@ -222,6 +244,18 @@ function render(): void {
       break;
     case "restart":
       screen = restart();
+      break;
+    case "edit":
+      screen = editList(v);
+      break;
+    case "person":
+      screen = personForm(v);
+      break;
+    case "kitItem":
+      screen = kitForm(v);
+      break;
+    case "box":
+      screen = boxForm(v);
       break;
     case "import":
       screen = importScreen(v);
@@ -267,10 +301,11 @@ function crew(): HTMLElement[] {
       "div",
       { class: "who" },
       h("div", { class: "name" }, s.name),
-      h("div", { class: "meta" }, meta, " ", s.signedIn ? h("span", { class: "pill in" }, "Signed in") : h("span", { class: "pill" }, "Not signed in")),
+      h("div", { class: "meta" }, meta, " ", s.canSignIn ? (s.signedIn ? h("span", { class: "pill in" }, "Signed in") : h("span", { class: "pill" }, "Not signed in")) : null),
       h("div", { class: "out" }, h("b", null, "You have out"), out.length ? out.map((k) => k.item).join(", ") : "Nothing"),
     ),
-    btn(s.signedIn ? "Sign out" : "Sign in", signInOut, s.signedIn ? "" : "go"),
+    s.kind === "admin" ? btn("Admin panel", () => go({ v: "admin", menu: null }), "stop") : null,
+    s.canSignIn ? btn(s.signedIn ? "Sign out" : "Sign in", signInOut, s.signedIn ? "" : "go") : null,
     btn("Take kit", () => go({ v: "take", items: null }), "blue"),
     btn("Return kit", () => go({ v: "return", items: null }), "", out.length === 0),
     btn("Open a box", () => go({ v: "boxes", items: null })),
@@ -369,7 +404,7 @@ function adminMenu(v: Extract<View, { v: "admin" }>): HTMLElement[] {
   const m = v.menu ?? {};
   const t = (title: string, sub: string, fn: () => void, cls = "") => h("button", { class: `tile ${cls}`, onclick: fn }, h("div", { class: "t" }, title), h("div", { class: "s" }, sub));
   return [
-    bar(`Admin · ${S.session?.name ?? ""}`),
+    bar(`Admin · ${S.session?.name ?? ""}`, () => go({ v: "crew" })),
     h(
       "div",
       { class: "main" },
@@ -377,8 +412,8 @@ function adminMenu(v: Extract<View, { v: "admin" }>): HTMLElement[] {
         "div",
         { class: "menu" },
         t("Students", m.studentsDisabled ? "Disabled now" : "Enabled", () => go({ v: "students", menu: null }), m.studentsDisabled ? "sel" : ""),
+        t("People, kit & boxes", "Edit anyone or anything", () => go({ v: "edit", tab: "people", q: "", items: null }), "blue-tile"),
         t("Enrol a fob", "New or spare fob", () => startEnrol()),
-        t("Lost / revoke", "Mark a fob lost or revoked", () => go({ v: "fobs", items: null, sel: null })),
         t("Day pass", "Guest fob for today", () => startDayPass()),
         t("Show mode", m.showMode ? "ON: boxes unlocked" : "Off", () => go({ v: "show", menu: null }), m.showMode ? "sel" : ""),
         t("Force return", m.kitOut ? `${m.kitOut} item${m.kitOut === 1 ? "" : "s"} out` : "Nothing out", () => go({ v: "force", items: null })),
@@ -506,34 +541,6 @@ async function submitEnrol(v: Extract<View, { v: "enrol" }>, who: Record<string,
 async function cancelCapture(): Promise<void> {
   await post("/api/admin/cancel", { session: sid() });
   back();
-}
-
-// lost / revoke
-function fobs(v: Extract<View, { v: "fobs" }>): HTMLElement[] {
-  const sel = v.sel;
-  return [
-    bar("Lost / revoke a fob", back),
-    h(
-      "div",
-      { class: "main" },
-      h(
-        "div",
-        { class: "pick" },
-        h("div", { class: "help" }, "Tap the fob, then choose Lost or Revoked. A lost fob is never used again."),
-        h(
-          "div",
-          { class: "tiles four", style: "flex: 1" },
-          (v.items ?? []).map((f) => h("button", { class: `tile${sel?.fob_uid === f.fob_uid ? " sel" : ""}`, onclick: () => ((v.sel = f), render()) }, h("div", { class: "t" }, f.name), h("div", { class: "s" }, `${f.role}${f.status === "Spare" ? " · spare" : ""} · …${f.fob_uid.slice(-4)}`), f.lostBefore ? h("div", { class: "s" }, `${f.lostBefore} lost before`) : null)),
-        ),
-        h(
-          "div",
-          { class: "foot" },
-          btn(sel ? `${sel.name}: Lost` : "Lost", () => act("/api/admin/fob-status", { uid: sel!.fob_uid, status: "Lost" }), "stop", !sel),
-          btn(sel ? `${sel.name}: Revoked` : "Revoked", () => act("/api/admin/fob-status", { uid: sel!.fob_uid, status: "Revoked" }), "warn", !sel),
-        ),
-      ),
-    ),
-  ];
 }
 
 // day pass
@@ -819,6 +826,272 @@ function importScreen(v: Extract<View, { v: "import" }>): HTMLElement[] {
   ];
 }
 
+// ---- editor: people, kit, boxes, spare fobs --------------------------------------------------
+
+const TABS: [Extract<View, { v: "edit" }>["tab"], string][] = [["people", "People"], ["kit", "Kit"], ["boxes", "Boxes"], ["spares", "Spare & guest fobs"]];
+const toEditor = (tab: Extract<View, { v: "edit" }>["tab"] = "people") => go({ v: "edit", tab, q: "", items: null });
+const blank = (x: unknown) => x === null || x === undefined || x === "";
+const lvl = (n: unknown) => (blank(n) ? "Any level" : `Level ${n}`);
+const short = (uid: string) => `…${uid.slice(-4)}`;
+
+function editList(v: Extract<View, { v: "edit" }>): HTMLElement[] {
+  const items = v.items;
+  const row = (cells: (string | HTMLElement | null)[], onclick: () => void, cls = "") => h("button", { class: `erow ${cls}`, onclick }, cells.map((c) => h("div", null, c ?? "")));
+  let body: HTMLElement;
+  if (items === null) body = h("div", { class: "rows" });
+  else if (items.length === 0) body = h("div", { class: "empty" }, v.q ? `Nobody matches “${v.q}”.` : "Nothing here yet.");
+  else if (v.tab === "people")
+    body = h(
+      "div",
+      { class: "rows people" },
+      items.map((p) =>
+        row(
+          [
+            h("b", null, p.name),
+            p.type === "Student" ? `Year ${p.year ?? "?"} · ${lvl(p.level)}` : p.type,
+            p.specialism ?? "",
+            p.fobs.length ? p.fobs.map((f: Row) => `${short(f.fob_uid)}${f.role === "Admin" ? " Admin" : ""}`).join(", ") : "no fob",
+            h("span", { class: `status-${p.status}` }, p.status),
+          ],
+          () => openPerson(p.person_id),
+          p.status === "Left" ? "dim" : "",
+        ),
+      ),
+    );
+  else if (v.tab === "kit")
+    body = h("div", { class: "rows kit" }, items.map((k) => row([h("b", null, k.item), k.category, `${lvl(k.required_level)}${k.specialism && k.specialism !== "Any" ? ` · ${k.specialism}` : ""}`, k.box ? `${k.box}${k.slot ? ` · ${k.slot}` : ""}` : "no box", k.out ? h("span", { class: "status-out" }, "out") : ""], () => go({ v: "kitItem", id: k.kit_id, draft: { ...k }, boxes: null }))));
+  else if (v.tab === "boxes")
+    body = h("div", { class: "rows boxes" }, items.map((b) => row([h("b", null, b.name), b.type, lvl(b.required_level), b.location || "", `${b.kitCount} item${b.kitCount === 1 ? "" : "s"}`], () => go({ v: "box", id: b.box_id, draft: { ...b } }))));
+  else
+    body = h(
+      "div",
+      { class: "rows spares" },
+      items.map((f) =>
+        h(
+          "div",
+          { class: "erow static" },
+          h("div", null, h("b", null, short(f.fob_uid))),
+          h("div", null, f.state === "spare" ? "Spare" : f.state === "day pass today" ? `Day pass today · Level ${f.level ?? 1}` : "Old day pass"),
+          h("div", { class: "note" }, f.notes || ""),
+          h(
+            "div",
+            { class: "acts" },
+            btn("Give to a person", () => go({ v: "enrol", step: "who", uid: f.fob_uid, people: null, draft: { role: "Standard", issuedOffset: 0 } }), "small"),
+            f.state !== "day pass today" ? btn("Day pass", () => go({ v: "daypass", step: "form", uid: f.fob_uid, guest: "", level: 1 }), "small") : null,
+            btn("Revoke", () => act("/api/admin/fob-status", { uid: f.fob_uid, status: "Revoked" }), "small stop"),
+          ),
+        ),
+      ),
+    );
+  const addLabel = { people: "+ Add a person", kit: "+ Add kit", boxes: "+ Add a box", spares: null }[v.tab];
+  return [
+    bar("People, kit & boxes", back),
+    h(
+      "div",
+      { class: "main", style: "flex-direction: column; gap: 12px" },
+      h(
+        "div",
+        { class: "tabs" },
+        TABS.map(([t, label]) => btn(label, () => go({ v: "edit", tab: t, q: "", items: null }), v.tab === t ? "on" : "")),
+        h("div", { class: "grow" }),
+        addLabel ? btn(addLabel, () => addNew(v.tab), "go small") : null,
+      ),
+      v.tab === "people"
+        ? h(
+            "div",
+            { class: "search" },
+            h("button", { class: `field${v.q ? "" : " placeholder"}`, onclick: () => keyboard("Search by name", v.q, 40, (x) => { mount("overlay"); if (x !== null) { v.q = x; void load(); } render(); }) }, v.q ? `Search: ${v.q}` : "Tap to search by name"),
+            v.q ? btn("Clear", () => ((v.q = ""), void load()), "small") : null,
+            h("div", { class: "note" }, "or tap their fob on the reader"),
+          )
+        : h("div", { class: "note" }, v.tab === "spares" ? "Fobs not given to anyone. Tap a fob on the reader to find it." : "Tap a row to change it."),
+      body,
+    ),
+  ];
+}
+
+function addNew(tab: Extract<View, { v: "edit" }>["tab"]): void {
+  if (tab === "people") go({ v: "person", id: null, draft: { type: "Student", level: 1, status: "Active", specialism: null }, fobs: [], lostFobs: 0, loaded: true, waitingFob: false });
+  else if (tab === "kit") go({ v: "kitItem", id: null, draft: { category: "Other", specialism: "Any", required_level: null, box_id: null }, boxes: null });
+  else if (tab === "boxes") go({ v: "box", id: null, draft: { type: "Fixed (PoE)", network: "Ethernet", offline_unlock_min: 5, required_level: null } });
+}
+
+function openPerson(id: string): void {
+  go({ v: "person", id, draft: {}, fobs: [], lostFobs: 0, loaded: false, waitingFob: false });
+}
+
+/** A labelled row of choice buttons. */
+function choices(opts: (string | number | null)[], cur: unknown, set: (x: any) => void, label?: (x: string | number | null) => string): HTMLElement {
+  return h("div", { class: "seg" }, opts.map((o) => btn(label ? label(o) : o === null ? "None" : String(o), () => (set(o), render()), (cur ?? null) === o ? "on" : "")));
+}
+
+function textField(title: string, value: unknown, max: number, set: (x: string) => void): HTMLElement {
+  return h("button", { class: `field${blank(value) ? " placeholder" : ""}`, onclick: () => keyboard(title, String(value ?? ""), max, (x) => { mount("overlay"); if (x !== null) set(x); render(); }) }, blank(value) ? "Tap to type" : String(value));
+}
+
+async function saveRow(path: string, id: string | null, fields: Row, then: (r: ApiResult) => void): Promise<void> {
+  const r = await post(path, { session: sid(), id, fields });
+  show(r);
+  if (r.ok) then(r);
+}
+
+function personForm(v: Extract<View, { v: "person" }>): HTMLElement[] {
+  if (!v.loaded) return [bar("Person", () => toEditor("people"))];
+  const d = v.draft;
+  const student = d.type === "Student";
+  const fobRow = (f: Row) => {
+    const live = f.status === "Active" || f.status === "Spare";
+    return h(
+      "div",
+      { class: `fobrow${live ? "" : " dim"}` },
+      h("div", null, h("b", null, short(f.fob_uid)), " ", f.role, h("div", { class: "note" }, live ? `${f.status} · issued ${f.issued ?? "?"}` : `${f.status} ${f.ended ?? ""}`)),
+      live
+        ? h(
+            "div",
+            { class: "acts" },
+            f.role !== "Day pass" ? btn(f.role === "Admin" ? "Make standard" : "Make admin", async () => { show(await post("/api/admin/edit/fob/role", { session: sid(), uid: f.fob_uid, role: f.role === "Admin" ? "Standard" : "Admin" })); void load(); }, "small") : null,
+            btn("Lost", async () => { show(await post("/api/admin/fob-status", { session: sid(), uid: f.fob_uid, status: "Lost" })); void load(); }, "small stop"),
+            btn("Revoke", async () => { show(await post("/api/admin/fob-status", { session: sid(), uid: f.fob_uid, status: "Revoked" })); void load(); }, "small warn"),
+          )
+        : null,
+    );
+  };
+  const fields = { name: d.name, type: d.type, year: student ? d.year : null, level: student ? d.level : null, specialism: d.specialism, status: d.status, notes: d.notes ?? "" };
+  return [
+    bar(v.id ? `${d.name ?? "Person"} · ${v.id}` : "New person", () => toEditor("people")),
+    h(
+      "div",
+      { class: "main" },
+      h(
+        "div",
+        { class: "pick" },
+        h(
+          "div",
+          { class: "form compact" },
+          h("div", { class: "lbl" }, "Name"),
+          textField("Full name", d.name, 60, (x) => (d.name = x)),
+          h("div", { class: "lbl" }, "Type"),
+          choices(["Student", "Staff", "Hire tech"], d.type, (x) => (d.type = x)),
+          student ? [h("div", { class: "lbl" }, "Year"), choices([7, 8, 9, 10, 11, 12, 13], d.year, (x) => (d.year = x))] : null,
+          student ? [h("div", { class: "lbl" }, "Level"), choices([1, 2, 3, 4], d.level, (x) => (d.level = x))] : null,
+          h("div", { class: "lbl" }, "Specialism"),
+          choices([null, "Lighting", "Sound", "Lighting + Sound"], d.specialism, (x) => (d.specialism = x)),
+          h("div", { class: "lbl" }, "Status"),
+          choices(["Active", "Disabled", "Left"], d.status, (x) => (d.status = x)),
+          h("div", { class: "lbl" }, "Notes"),
+          textField("Notes", d.notes, 200, (x) => (d.notes = x)),
+        ),
+        h("div", { class: "grow" }),
+        h(
+          "div",
+          { class: "foot" },
+          btn(v.id ? "Save" : "Add person", () => saveRow("/api/admin/edit/person", v.id, fields, (r) => (v.id ? (void load()) : openPerson(String(r.id)))), "go", !d.name || !d.type),
+          v.id && d.status !== "Left" ? btn("Mark as left", async () => { show(await post("/api/admin/edit/person/leave", { session: sid(), id: v.id })); toEditor("people"); }, "stop") : null,
+        ),
+      ),
+      v.id
+        ? h(
+            "div",
+            { class: "pick fobs" },
+            h("h3", null, "Fobs"),
+            v.lostFobs >= 1 ? h("div", { class: "note" }, `${v.lostFobs} lost before${v.lostFobs >= 1 ? ": another lost fob is a £2 charge" : ""}`) : null,
+            h("div", { class: "fobcol" }, v.fobs.length ? v.fobs.map(fobRow) : h("div", { class: "note" }, "No fobs yet.")),
+            h("div", { class: "grow" }),
+            v.waitingFob
+              ? h("div", { class: "waiting" }, h("div", { class: "fob small" }, "TAP"), "Tap the new fob…", btn("Cancel", async () => { await post("/api/admin/cancel", { session: sid() }); v.waitingFob = false; render(); }, "small"))
+              : btn("+ Add fob (tap it)", async () => { const r = await post("/api/admin/edit/fob/add/start", { session: sid(), personId: v.id }); if (r.ok) { v.waitingFob = true; render(); } else show(r); }, "blue"),
+          )
+        : h("div", { class: "pick fobs" }, h("h3", null, "Fobs"), h("div", { class: "note" }, "Add the person first, then add their fob here.")),
+    ),
+  ];
+}
+
+const CATEGORIES = ["Lighting", "Sound", "Radio mics", "Keys", "Show network", "Other"];
+
+function kitForm(v: Extract<View, { v: "kitItem" }>): HTMLElement[] {
+  const d = v.draft;
+  const fields = { item: d.item, category: d.category, required_level: d.required_level, specialism: d.specialism, box_id: d.box_id, slot: d.slot ?? "", notes: d.notes ?? "" };
+  const boxes = v.boxes ?? [];
+  return [
+    bar(v.id ? `${d.item ?? "Kit"} · ${v.id}` : "New kit item", () => toEditor("kit")),
+    h(
+      "div",
+      { class: "main" },
+      h(
+        "div",
+        { class: "pick" },
+        h(
+          "div",
+          { class: "form" },
+          h("div", { class: "lbl" }, "Item"),
+          textField("Item", d.item, 60, (x) => (d.item = x)),
+          h("div", { class: "lbl" }, "Category"),
+          choices(CATEGORIES, d.category, (x) => (d.category = x)),
+          h("div", { class: "lbl" }, "Level needed"),
+          choices([null, 1, 2, 3, 4], d.required_level, (x) => (d.required_level = x), (x) => (x === null ? "Any" : `Level ${x}`)),
+          h("div", { class: "lbl" }, "Specialism"),
+          choices(["Any", "Lighting", "Sound"], d.specialism ?? "Any", (x) => (d.specialism = x)),
+          h("div", { class: "lbl" }, "Lives in"),
+          h("div", { class: "seg" }, btn("No box", () => ((d.box_id = null), render()), blank(d.box_id) ? "on" : ""), boxes.map((b) => btn(b.name, () => ((d.box_id = b.box_id), render()), d.box_id === b.box_id ? "on" : ""))),
+          h("div", { class: "lbl" }, "Slot"),
+          textField("Slot (drawer, hook…)", d.slot, 40, (x) => (d.slot = x)),
+          h("div", { class: "lbl" }, "Notes"),
+          textField("Notes", d.notes, 200, (x) => (d.notes = x)),
+        ),
+        h("div", { class: "grow" }),
+        h(
+          "div",
+          { class: "foot" },
+          btn(v.id ? "Save" : "Add kit", () => saveRow("/api/admin/edit/kit", v.id, fields, () => toEditor("kit")), "go", !d.item),
+          v.id ? btn("Remove item", async () => { const r = await post("/api/admin/edit/kit/remove", { session: sid(), id: v.id }); show(r); if (r.ok) toEditor("kit"); }, "stop") : null,
+        ),
+      ),
+    ),
+  ];
+}
+
+function boxForm(v: Extract<View, { v: "box" }>): HTMLElement[] {
+  const d = v.draft;
+  const fields = { name: d.name, type: d.type, required_level: d.required_level, network: d.network, ip_address: d.ip_address, location: d.location ?? "", offline_unlock_min: d.offline_unlock_min, notes: d.notes ?? "" };
+  const mins = Number(d.offline_unlock_min ?? 5);
+  return [
+    bar(v.id ? `${d.name ?? "Box"} · ${v.id}` : "New box", () => toEditor("boxes")),
+    h(
+      "div",
+      { class: "main" },
+      h(
+        "div",
+        { class: "pick" },
+        h(
+          "div",
+          { class: "form" },
+          h("div", { class: "lbl" }, "Name"),
+          textField("Box name", d.name, 60, (x) => (d.name = x)),
+          h("div", { class: "lbl" }, "Type"),
+          choices(["Fixed (PoE)", "Flight case (Wi-Fi)", "Key cabinet"], d.type, (x) => (d.type = x)),
+          h("div", { class: "lbl" }, "Level needed"),
+          choices([null, 1, 2, 3, 4], d.required_level, (x) => (d.required_level = x), (x) => (x === null ? "Any" : `Level ${x}`)),
+          h("div", { class: "lbl" }, "Network"),
+          h("div", { class: "seg" }, choices(["Ethernet", "Wi-Fi"], d.network, (x) => (d.network = x)), h("div", { style: "width: 260px" }, textField("IP address (e.g. 10.102.40.101)", d.ip_address, 15, (x) => (d.ip_address = x || null)))),
+          h("div", { class: "lbl" }, "Location"),
+          textField("Location", d.location, 60, (x) => (d.location = x)),
+          h("div", { class: "lbl" }, "Offline unlock"),
+          h("div", { class: "seg" }, btn("−", () => ((d.offline_unlock_min = Math.max(0, mins - 1)), render()), "small"), h("div", { class: "field", style: "width: 200px" }, `${mins} min`), btn("+", () => ((d.offline_unlock_min = mins + 1), render()), "small"), h("div", { class: "note" }, "after the hub goes quiet")),
+          h("div", { class: "lbl" }, "Notes"),
+          textField("Notes", d.notes, 200, (x) => (d.notes = x)),
+        ),
+        h("div", { class: "grow" }),
+        h(
+          "div",
+          { class: "foot" },
+          btn(v.id ? "Save" : "Add box", () => saveRow("/api/admin/edit/box", v.id, fields, () => toEditor("boxes")), "go", !d.name),
+          v.id ? btn("Remove box", async () => { const r = await post("/api/admin/edit/box/remove", { session: sid(), id: v.id }); show(r); if (r.ok) toEditor("boxes"); }, "stop") : null,
+        ),
+      ),
+    ),
+  ];
+}
+
 // ---- overlays --------------------------------------------------------------------------------
 
 function renderConfirm(): void {
@@ -867,8 +1140,7 @@ function setSession(s: SessionView | null): void {
     clearTimeout(S.deniedTimer as number);
     mount("overlay");
     S.overview = null;
-    go(s.kind === "admin" ? { v: "admin", menu: null } : { v: "crew" });
-    if (s.kind === "admin") void get(`/api/panel/overview?session=${s.id}`).then((o) => { S.overview = o; render(); });
+    go({ v: "crew" });
     return;
   }
   // same session updated (signed in, kit out, pending confirm, capture)
@@ -1006,8 +1278,23 @@ stream(
         }
       } else toast(d.reason ?? "That didn't work", false);
     },
+    found: (d) => {
+      if (!EDITOR_VIEWS.has(S.view.v)) return;
+      if (!d.ok) return void toast(d.reason, false);
+      if (d.kind === "person") openPerson(d.id);
+      else toEditor("spares");
+    },
     captured: (d) => {
       const v = S.view;
+      if (d.purpose === "add_fob") {
+        if (v.v === "person") {
+          v.waitingFob = false;
+          void load();
+        }
+        if (d.ok) toast(d.message ?? "Fob added");
+        else toast(d.reason, false);
+        return;
+      }
       if (!d.ok) {
         toast(d.reason, false);
         if (v.v === "enrol" || v.v === "daypass") back();

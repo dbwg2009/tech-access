@@ -4,11 +4,12 @@
 import { Hono } from "hono";
 import { localOnly } from "../localOnly";
 import type { Admin } from "../panel/admin";
+import type { Editor } from "../panel/editor";
 import type { Panel } from "../panel/panel";
 import { body, send } from "./panel";
 import { parseResolutions } from "./import";
 
-export function adminRoutes(panel: Panel, admin: Admin) {
+export function adminRoutes(panel: Panel, admin: Admin, editor: Editor) {
   const r = new Hono();
   r.use("/admin/*", localOnly());
 
@@ -33,7 +34,6 @@ export function adminRoutes(panel: Panel, admin: Admin) {
 
   get("menu", () => admin.menu());
   get("status", () => admin.status());
-  get("fobs", () => ({ fobs: admin.fobs() }));
   get("people", () => ({ people: admin.people() }));
   get("kit-out", () => ({ kit: admin.kitOutList() }));
   get("end-of-session", () => admin.endOfSessionPreview());
@@ -61,6 +61,27 @@ export function adminRoutes(panel: Panel, admin: Admin) {
     if (!res) return { ok: false, reason: 'resolutions must be {"<key>": "panel" | "sheet"}', status: 400 };
     return admin.importApply(s, b.batchId, res);
   });
+
+  // Editor (People / Kit / Boxes / Spare fobs). Saves need no confirm tap.
+  get("edit/people", (q) => ({ people: editor.people(q.q) }));
+  r.get("/admin/edit/person", (c) => {
+    const s = session(c.req.query("session"));
+    if ("ok" in s) return send(c, s);
+    const p = editor.person(c.req.query("id"));
+    return p ? c.json(p) : c.json({ ok: false, reason: "Person not found" }, 404);
+  });
+  get("edit/kit", () => ({ kit: editor.kit() }));
+  get("edit/boxes", () => ({ boxes: editor.boxes() }));
+  get("edit/spares", () => ({ fobs: editor.spares() }));
+  post("edit/person", (s, b) => editor.savePerson(s, b.id, b.fields));
+  post("edit/person/leave", (s, b) => editor.removePerson(s, b.id));
+  post("edit/kit", (s, b) => editor.saveKit(s, b.id, b.fields));
+  post("edit/kit/remove", (s, b) => editor.removeKit(s, b.id));
+  post("edit/box", (s, b) => editor.saveBox(s, b.id, b.fields));
+  post("edit/box/remove", (s, b) => editor.removeBox(s, b.id));
+  post("edit/fob/role", (s, b) => editor.fobRole(s, b.uid, b.role));
+  post("edit/fob/add/start", (s, b) => admin.startAddFob(s, b.personId));
+  post("edit/find", (s, b) => editor.setFind(s, b.on));
 
   return r;
 }

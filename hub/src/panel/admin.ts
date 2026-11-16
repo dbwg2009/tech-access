@@ -63,12 +63,11 @@ export class Admin {
   ) {
     this.db = panel.db;
     panel.registerConfirmer("students_disabled", (s, p, uid) => this.doStudents(s, true, uid));
-    panel.registerConfirmer("fob_status", (s, p, uid) => this.doFobStatus(s, p, uid));
     panel.registerConfirmer("show_mode", (s, p, uid) => this.doShowMode(s, p.params.on === true, uid));
     panel.registerConfirmer("force_return", (s, p, uid) => this.doForceReturn(s, p, uid));
     panel.registerConfirmer("restart", (s, p, uid) => this.doRestart(s, p, uid));
     panel.registerConfirmer("import_apply", (s, p, uid) => this.doImport(s, p, uid));
-    panel.setCaptureHandler((s, uid, purpose) => this.onCaptured(s, purpose, uid));
+    panel.setCaptureHandler((s, uid, c) => (c.purpose === "add_fob" ? this.onAddFob(s, c.personId!, uid) : this.onCaptured(s, c.purpose, uid)));
   }
 
   private changed(): void {
@@ -117,45 +116,21 @@ export class Admin {
     return ok(disabled ? "Students are disabled" : "Students are enabled again");
   }
 
-  // ---- fobs: list, lost / revoke ------------------------------------------------------------------
+  // ---- fobs: lost / revoke ------------------------------------------------------------------
 
-  fobs(): Record<string, unknown>[] {
-    const people = new Map(allPeople(this.db).map((p) => [p.person_id, p]));
-    return allFobs(this.db)
-      .filter((f) => f.status === "Active" || f.status === "Spare")
-      .map((f) => {
-        const p = f.person_id ? people.get(f.person_id) : undefined;
-        return {
-          fob_uid: f.fob_uid,
-          name: p ? firstName(p.name) : f.role === "Day pass" ? "Day pass" : "Spare fob",
-          person_id: f.person_id,
-          role: f.role,
-          status: f.status,
-          issued: f.issued,
-          lostBefore: f.person_id ? lostFobCount(this.db, f.person_id) : 0,
-        };
-      })
-      .sort((a, b) => a.name.localeCompare(b.name));
-  }
-
+  /**
+   * Mark a fob Lost or Revoked. Done from a person's profile (or the spare fobs list) in the
+   * editor, straight away: no confirm tap (Daniel, 2026-11-16, supersedes the earlier rule).
+   */
   fobStatus(s: Session, uid: unknown, status: unknown): Result {
     if (status !== "Lost" && status !== "Revoked") return no('status must be "Lost" or "Revoked"', 400);
     const fob = typeof uid === "string" ? getFob(this.db, uid) : null;
     if (!fob) return no("Fob not found", 404);
     if (fob.status === "Lost" || fob.status === "Revoked") return no(`That fob is already ${fob.status}`);
-    const who = fob.person_id ? firstName(getPerson(this.db, fob.person_id)?.name) : "spare";
-    return this.panel.requestConfirm(s, "fob_status", `Mark ${who}'s fob ${status === "Lost" ? "lost" : "revoked"}`, { uid: fob.fob_uid, status });
-  }
-
-  private doFobStatus(s: Session, p: Pending, confirmedBy: string): Result {
-    const uid = p.params.uid as string;
-    const status = p.params.status as "Lost" | "Revoked";
-    const fob = getFob(this.db, uid);
-    if (!fob) return no("Fob not found");
     let charge = false;
     this.db.transaction(() => {
-      const ev = this.action(s, status === "Lost" ? "fob_lost" : "fob_revoked", confirmedBy, { uid, was: fob.status }, { person_id: fob.person_id });
-      updateRow(this.db, "fobs", uid, { status, ended: fob.ended ?? this.today() }, { fobUid: confirmedBy, eventId: ev, ts: this.panel.iso() });
+      const ev = this.action(s, status === "Lost" ? "fob_lost" : "fob_revoked", null, { uid: fob.fob_uid, was: fob.status }, { person_id: fob.person_id });
+      updateRow(this.db, "fobs", fob.fob_uid, { status, ended: fob.ended ?? this.today() }, { fobUid: s.fobUid, eventId: ev, ts: this.panel.iso() });
       // £2 from a person's second lost fob (workbook-format.md).
       charge = status === "Lost" && !!fob.person_id && lostFobCount(this.db, fob.person_id) >= 2;
     })();
@@ -185,6 +160,18 @@ export class Admin {
     // An expired day pass can be handed to the next guest.
     if (fob.role === "Day pass" && fob.status === "Active" && fob.issued !== null && fob.issued < this.today()) return null;
     return fob.role === "Day pass" && fob.issued === this.today() ? "That day pass is in use today" : "That isn't a spare fob";
+  }
+
+  /** "Add fob" on a person's profile: the tapped fob is enrolled to them straight away. */
+  onAddFob(s: Session, personId: string, uid: string): void {
+    const r = this.enrol(s, { uid, personId, role: "Standard" });
+    this.panel.stream.publish("captured", r.ok ? { ok: true, purpose: "add_fob", uid, personId, message: r.message } : { ok: false, purpose: "add_fob", reason: r.reason });
+    this.panel.publishSession();
+  }
+
+  startAddFob(s: Session, personId: unknown): Result {
+    if (typeof personId !== "string" || !getPerson(this.db, personId)) return no("Person not found", 404);
+    return this.panel.startCapture(s, "add_fob", personId);
   }
 
   /** Called by Panel.handleTap via the capture handler (see constructor). */

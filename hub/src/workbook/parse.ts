@@ -43,13 +43,13 @@ export interface ParsedWorkbook {
   warnings: Issue[];
 }
 
-type Cell = string | number | boolean | Date | null;
+export type Cell = string | number | boolean | Date | null;
 
 function readSheetAoa(ws: XLSX.WorkSheet): Cell[][] {
   return XLSX.utils.sheet_to_json<Cell[]>(ws, { header: 1, raw: true, defval: null, blankrows: true });
 }
 
-function normaliseCell(col: ColumnDef, v: Cell): Result<string | number | null> {
+export function normaliseCell(col: ColumnDef, v: Cell): Result<string | number | null> {
   if (isBlank(v)) {
     if (col.required) return { ok: false, error: "is required" };
     if (col.default !== undefined) return { ok: true, value: col.default };

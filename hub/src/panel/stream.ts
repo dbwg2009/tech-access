@@ -2,7 +2,7 @@
 // screen helper subscribe; the hub publishes taps, session changes, overview changes and screen
 // wake / sleep.
 
-export type PanelEventName = "tap" | "session" | "denied" | "overview" | "screen" | "confirm" | "captured" | "notice";
+export type PanelEventName = "tap" | "session" | "denied" | "overview" | "screen" | "confirm" | "captured" | "found" | "notice";
 
 export interface PanelEvent {
   event: PanelEventName;

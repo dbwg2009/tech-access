@@ -163,6 +163,7 @@ export function applyBatch(
     const unresolved = fresh.conflicts.filter((c) => resolutions[c.key] !== "panel" && resolutions[c.key] !== "sheet").map((c) => c.key);
     if (unresolved.length) return { kind: "unresolved", keys: unresolved };
     const keepRemovals = new Set<string>();
+    const keepArchived = new Set<string>();
     for (const c of fresh.conflicts) {
       const def = SHEETS.find((d) => d.key === c.sheet)!;
       if (resolutions[c.key] === "sheet") {
@@ -172,6 +173,10 @@ export function applyBatch(
       // "panel": keep the hub's value.
       if (c.kind === "removal") {
         keepRemovals.add(`${c.sheet}/${c.id}`);
+        continue;
+      }
+      if (c.kind === "restore") {
+        keepArchived.add(`${c.sheet}/${c.id}`);
         continue;
       }
       const field = def.columns.find((x) => x.header === c.column)!.field;
@@ -186,7 +191,8 @@ export function applyBatch(
       const changed = new Set([...fresh.sheets[key].adds.map((a) => a.id), ...fresh.sheets[key].changes.map((c) => c.id)]);
       const def = SHEETS.find((s) => s.key === key)!;
       for (const row of parsed.rows[key] as unknown as Record<string, unknown>[]) {
-        if (changed.has(row[def.idField] as string)) upsertRow(db, key, row as never, ts);
+        const id = row[def.idField] as string;
+        if (changed.has(id) && !keepArchived.has(`${key}/${id}`)) upsertRow(db, key, row as never, ts);
       }
     }
     for (const key of [...order].reverse()) {
