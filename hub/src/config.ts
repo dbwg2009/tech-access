@@ -1,5 +1,6 @@
 import { dirname, isAbsolute, resolve } from "node:path";
 import { existsSync, readFileSync } from "node:fs";
+import { normaliseUid } from "./uid";
 
 export interface Config {
   dbPath: string;
@@ -9,6 +10,12 @@ export interface Config {
   mqttUsername: string;
   usbMountRoot: string;
   timezone: string;
+  /** Development only: no PN532; taps come from POST /api/dev/tap and the panel's dev key. */
+  fakeReader: boolean;
+  /** Serial device of the desk PN532 (HSU). Pi 5: GPIO14/15 = UART0 = /dev/ttyAMA0. */
+  readerDevice: string;
+  /** UIDs the panel's dev key cycles through (fake reader only). */
+  fakeFobs: string[];
 }
 
 export const DEFAULTS: Config = {
@@ -19,12 +26,31 @@ export const DEFAULTS: Config = {
   mqttUsername: "hub",
   usbMountRoot: "/media",
   timezone: "Europe/London",
+  fakeReader: false,
+  readerDevice: "/dev/ttyAMA0",
+  fakeFobs: [],
 };
 
 function str(v: unknown, key: string, fallback: string): string {
   if (v === undefined) return fallback;
   if (typeof v !== "string" || v.trim() === "") throw new Error(`config: ${key} must be a non-empty string`);
   return v;
+}
+
+function bool(v: unknown, key: string, fallback: boolean): boolean {
+  if (v === undefined) return fallback;
+  if (typeof v !== "boolean") throw new Error(`config: ${key} must be true or false`);
+  return v;
+}
+
+function uidList(v: unknown, key: string): string[] {
+  if (v === undefined) return [];
+  if (!Array.isArray(v)) throw new Error(`config: ${key} must be a list of fob UIDs`);
+  return v.map((x) => {
+    const r = normaliseUid(x);
+    if (typeof x !== "string" || !r.ok) throw new Error(`config: ${key}: ${r.ok ? "UIDs must be quoted strings" : r.error}`);
+    return r.value;
+  });
 }
 
 /** Parse TOML text into a Config. Relative db_path resolves against baseDir. */
@@ -49,6 +75,9 @@ export function parseConfig(text: string, baseDir: string): Config {
     mqttUsername: str(raw.mqtt_username, "mqtt_username", DEFAULTS.mqttUsername),
     usbMountRoot: str(raw.usb_mount_root, "usb_mount_root", DEFAULTS.usbMountRoot),
     timezone,
+    fakeReader: bool(raw.fake_reader, "fake_reader", DEFAULTS.fakeReader),
+    readerDevice: str(raw.reader_device, "reader_device", DEFAULTS.readerDevice),
+    fakeFobs: uidList(raw.fake_fobs, "fake_fobs"),
   };
 }
 

@@ -3,6 +3,8 @@ import type { Database } from "bun:sqlite";
 import { extname, resolve, sep } from "node:path";
 import type { Config } from "./config";
 import { schemaVersion } from "./db";
+import type { FobReader } from "./reader/types";
+import { devRoutes } from "./routes/dev";
 import { importRoutes } from "./routes/import";
 import { VERSION } from "./version";
 
@@ -11,6 +13,8 @@ export interface AppDeps {
   config: Config;
   startedAt?: number;
   now?: () => Date;
+  /** Desk fob reader. Optional so tests that don't care about it can leave it out. */
+  reader?: FobReader;
 }
 
 const PUBLIC_DIR = resolve(import.meta.dir, "../public");
@@ -23,7 +27,7 @@ const TYPES: Record<string, string> = {
   ".woff2": "font/woff2",
 };
 
-export function createApp({ db, config, startedAt = Date.now(), now = () => new Date() }: AppDeps) {
+export function createApp({ db, config, startedAt = Date.now(), now = () => new Date(), reader }: AppDeps) {
   const app = new Hono();
 
   app.get("/api/health", (c) => {
@@ -44,12 +48,15 @@ export function createApp({ db, config, startedAt = Date.now(), now = () => new 
         uptimeSeconds: Math.round((Date.now() - startedAt) / 1000),
         timezone: config.timezone,
         now: new Date().toISOString(),
+        // A missing reader doesn't make the hub unhealthy: boxes and the API still work.
+        reader: reader ? { kind: reader.kind, ...reader.status() } : null,
       },
       dbStatus === "ok" ? 200 : 503,
     );
   });
 
   app.route("/api", importRoutes(db, config, now));
+  app.route("/api", devRoutes(reader));
   app.all("/api/*", (c) => c.json({ error: "Not found" }, 404));
 
   // Local static files only. No CDN.

@@ -106,4 +106,4 @@ into the Claude Sheet. The export:
 
 Importing an export straight back shows **no changes**. That's the round-trip check.
 
-Sign-in and kit out/in events are **never** in the workbook. They stay in the hub, for Daniel only.
+Sign-in and kit out/in events are **never** in the workbook. They stay in the hub; any admin fob can view them on the desk panel.

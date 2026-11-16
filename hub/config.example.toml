@@ -19,3 +19,11 @@ usb_mount_root = "/media"
 
 # All local times (day pass expiry, export timestamps for humans).
 timezone = "Europe/London"
+
+# Desk fob reader: PN532 in HSU mode on the Pi's GPIO UART (Pi 5: GPIO14/15 = /dev/ttyAMA0).
+reader_device = "/dev/ttyAMA0"
+
+# Development only. true = no PN532; taps come from POST /api/dev/tap {"uid": "..."} (loopback
+# only) and the panel's dev key, which cycles through fake_fobs. Never true on the Pi.
+fake_reader = false
+fake_fobs = []

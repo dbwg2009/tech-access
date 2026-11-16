@@ -92,4 +92,4 @@ Every item has a location (Box ID + Slot) in the data model from day one, ready 
 
 ## Never in the workbook
 
-Sign-in and kit out/in events stay in the hub database and are viewable by Daniel only.
+Sign-in and kit out/in events stay in the hub database. They are viewable on the desk panel with any admin fob.
