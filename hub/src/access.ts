@@ -1,11 +1,12 @@
 // Access decisions. Pure: no I/O, no clock, no DB. Callers load the rows and pass `now`.
 // Policy sources: docs/brief.md and docs/decisions.md. Reasons are short: they show on the panel.
+import { firstName } from "./names";
 import { localDate } from "./time";
 import type { Box, Fob, Kit, Person } from "./workbook/schema";
 
 export interface AccessSettings {
   studentsDisabled: boolean;
-  /** Not used by any rule yet (to be decided with the panel, weeks 3-4). */
+  /** Show mode: every box unlocked, no fob needed (decision 2026-11-16). Boxes only, not kit. */
   showMode?: boolean;
 }
 
@@ -60,7 +61,7 @@ function common(fob: FobIn | null, person: PersonIn | null, settings: AccessSett
   if (fob.status !== "Active") return deny(`This fob is ${fob.status}`);
   if (fob.person_id !== null) {
     if (!person || person.person_id !== fob.person_id) return deny("Fob's owner not found");
-    if (person.status !== "Active") return deny(`${person.name} is ${person.status}`);
+    if (person.status !== "Active") return deny(`${firstName(person.name)} is ${person.status}`);
   } else if (fob.role !== "Day pass") {
     return deny("Fob isn't assigned to anyone");
   }
@@ -86,8 +87,22 @@ function levelCheck(fob: FobIn, person: PersonIn | null, required: number | null
   return allow(`Level ${have}`);
 }
 
+/**
+ * In show mode every box opens with no fob at all (fob may be null), whatever the fob or
+ * "disable all students" says. Otherwise the normal checks and the box's Required level.
+ */
 export function decideBoxOpen({ fob, person, box, settings, now, timezone = "Europe/London" }: BoxInput): Decision {
+  if (settings.showMode) return allow("Show mode");
   return common(fob, person, settings, now, timezone) ?? levelCheck(fob!, person, box.required_level);
+}
+
+/**
+ * May this fob open a crew card on the desk panel? The checks every action shares (fob Active,
+ * person Active, day pass valid today, students not disabled). Each action then runs its own
+ * decision (decideKitTake, decideBoxOpen).
+ */
+export function decideCrewCard(fob: FobIn | null, person: PersonIn | null, settings: AccessSettings, now: Date, timezone = "Europe/London"): Decision {
+  return common(fob, person, settings, now, timezone) ?? allow("OK");
 }
 
 /**
@@ -130,7 +145,7 @@ export function canApplySoftwareUpdate(fob: FobIn | null, person: PersonIn | nul
   if (fob.status !== "Active") return deny(`This fob is ${fob.status}`);
   if (fob.role !== "Standard") return deny("Day passes can't update software");
   if (!person || person.person_id !== fob.person_id) return deny("Fob isn't assigned to anyone");
-  if (person.status !== "Active") return deny(`${person.name} is ${person.status}`);
+  if (person.status !== "Active") return deny(`${firstName(person.name)} is ${person.status}`);
   if (person.type === "Hire tech") return deny("Hire techs can't update software");
   if (settings.studentsDisabled && person.type === "Student") return deny("Students are disabled right now");
   const have = effectiveLevel(fob, person);
