@@ -1,32 +1,13 @@
 import * as XLSX from "xlsx";
 import { localDate } from "../time";
+import { cellText, fail, normaliseUid, ok, type Result } from "../uid";
 
 export { localDate };
 
-export type Result<T> = { ok: true; value: T } | { ok: false; error: string };
-const ok = <T>(value: T): Result<T> => ({ ok: true, value });
-const fail = <T>(error: string): Result<T> => ({ ok: false, error });
+export { cellText, normaliseUid, type Result };
 
 export function isBlank(v: unknown): boolean {
   return v === null || v === undefined || (typeof v === "string" && v.trim() === "");
-}
-
-export function cellText(v: unknown): string {
-  if (v === null || v === undefined) return "";
-  if (v instanceof Date) return v.toISOString();
-  return String(v).trim();
-}
-
-/** NTAG UID: uppercase hex, strip spaces/colons/dashes, 4, 7 or 10 bytes. */
-export function normaliseUid(v: unknown): Result<string> {
-  const s = cellText(v).replace(/[\s:-]/g, "").toUpperCase();
-  if (!/^[0-9A-F]*$/.test(s)) return fail(`"${cellText(v)}" is not hex`);
-  if (![8, 14, 20].includes(s.length)) {
-    const hint =
-      typeof v === "number" ? " (the cell is a number: format the column as text so leading zeros survive)" : "";
-    return fail(`"${cellText(v)}" is ${s.length} hex digits; a UID is 4, 7 or 10 bytes (8, 14 or 20 digits)${hint}`);
-  }
-  return ok(s);
 }
 
 export function normaliseInt(v: unknown, min: number, max?: number): Result<number> {
