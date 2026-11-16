@@ -8,7 +8,7 @@ import { exportWorkbook } from "../workbook/export";
 
 const MAX_UPLOAD = 10 * 1024 * 1024;
 
-export function importRoutes(db: Database, config: Config, now: () => Date) {
+export function importRoutes(db: Database, config: Config, now: () => Date, onDataChanged?: () => void) {
   const r = new Hono();
   r.use("*", localOnly());
 
@@ -32,6 +32,7 @@ export function importRoutes(db: Database, config: Config, now: () => Date) {
     const body = (await c.req.json().catch(() => null)) as { fobUid?: unknown } | null;
     if (!body || typeof body.fobUid !== "string") return c.json({ error: 'Body must be {"fobUid": "..."}' }, 400);
     const res = applyBatch(db, Number(c.req.param("id")), body.fobUid, now(), config.timezone);
+    if (res.kind === "applied") onDataChanged?.();
     switch (res.kind) {
       case "applied":
       case "already_applied":
