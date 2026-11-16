@@ -23,25 +23,26 @@ path**: if the hub dies mid-show, Eos, QLab and the WING carry on, and the boxes
 | 6 | [Day to day](Day-to-Day.md) | Logs, restarts, box logins, updates, backups |
 | 7 | [Troubleshooting](Troubleshooting.md) | Something's wrong |
 | 8 | [Rebuild and handover](Rebuild-and-Handover.md) | The Pi died; or you're taking this over |
+| 9 | [The desk panel](Desk-Panel.md) | Using the touchscreen, the admin menu, the fob reader; first hardware test |
 
-## What exists so far (weeks 1–2)
+## What exists so far (weeks 1–4)
 
 | Built | Coming |
 | --- | --- |
-| Pi hub: NVMe boot, static IP, RTC, chrony, Mosquitto, local CA, hub service | Desk panel UI + Pi fob reader (weeks 3–4) |
-| Database, workbook import with preview, export | First lock box + OTA (weeks 5–6) |
-| Access rules (levels, specialisms, day passes, admin) | Management USBs: TECHBACKUP, TECHUPDATE, TECHSOFTWARE (week 7) |
-| | Stage Door port + iPad door station (weeks 8–10) |
-| | Nomad agent, kit tags, more boxes (week 11+) |
+| Pi hub: NVMe boot, static IP, RTC, chrony, Mosquitto, local CA, hub service | First lock box + OTA (weeks 5–6) |
+| Database, workbook import with preview, export | Management USBs: TECHBACKUP, TECHUPDATE, TECHSOFTWARE (week 7) |
+| Access rules (levels, specialisms, day passes, admin, show mode) | Stage Door port + iPad door station (weeks 8–10) |
+| Desk panel: touchscreen kiosk, PN532 fob reader, crew card, admin menu, event log | Nomad agent, kit tags, more boxes (week 11+) |
+| MQTT topics for the boxes ([docs/mqtt.md](../mqtt.md)) | |
 
-Until the panel exists, imports and exports are done with `curl` on the Pi
-([page 5](The-Workbook.md)).
+Imports can be previewed and applied from the panel's admin menu ([page 9](Desk-Panel.md)) or with
+`curl` on the Pi ([page 5](The-Workbook.md)).
 
 ## The short version
 
 1. Build the hardware, flash **Raspberry Pi OS Lite (64-bit, Trixie)** to the NVMe with hostname `tech-hub`.
 2. With internet: `sudo git clone https://github.com/dbwg2009/tech-access /opt/tech-access`
-3. `cd /opt/tech-access/pi` and run `01` (then reboot), `02`, `03`, `04`, `05`, each with `sudo`.
+3. `cd /opt/tech-access/pi` and run `01` (then reboot), `02`, `03`, `04`, `05`, then `06` and `07` (then reboot), each with `sudo`.
 4. Plug into the show network. From the Nomad PC: `curl.exe http://10.102.40.10:8080/api/health`
 
 ## Rules that shape everything

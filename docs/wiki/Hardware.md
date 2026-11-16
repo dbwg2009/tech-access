@@ -68,7 +68,7 @@ On a Pi 5, GPIO14/15 are `UART0`, which Linux calls **`/dev/ttyAMA0`**. It's off
 (`/dev/ttyAMA10`). So the hub is set to `reader_device = "/dev/ttyAMA0"`. (Source: Raspberry Pi
 documentation, *Configuration → Configure UARTs*, checked 16 Nov 2026.)
 
-The reader setup script (weeks 3–4, step 5) does this, so you don't have to by hand:
+`sudo ./07-reader.sh` does this, so you don't have to by hand (then reboot):
 
 - adds `dtparam=uart0=on` to `/boot/firmware/config.txt` (if `/dev/ttyAMA0` still doesn't
   appear after a reboot, `dtoverlay=uart0-pi5` is the documented Pi 5 alternative);

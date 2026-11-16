@@ -4,11 +4,23 @@ import type { Config } from "../config";
 import { localOnly } from "../localOnly";
 import { localDate } from "../workbook/normalise";
 import { applyBatch, createBatch, getBatch } from "../workbook/batches";
+import type { Resolution } from "../workbook/diff";
 import { exportWorkbook } from "../workbook/export";
 
 const MAX_UPLOAD = 10 * 1024 * 1024;
 
-export function importRoutes(db: Database, config: Config, now: () => Date) {
+export function parseResolutions(v: unknown): Record<string, Resolution> | null {
+  if (v === undefined || v === null) return {};
+  if (typeof v !== "object" || Array.isArray(v)) return null;
+  const out: Record<string, Resolution> = {};
+  for (const [k, x] of Object.entries(v)) {
+    if (x !== "panel" && x !== "sheet") return null;
+    out[k] = x;
+  }
+  return out;
+}
+
+export function importRoutes(db: Database, config: Config, now: () => Date, onDataChanged?: () => void) {
   const r = new Hono();
   r.use("*", localOnly());
 
@@ -29,9 +41,12 @@ export function importRoutes(db: Database, config: Config, now: () => Date) {
   });
 
   r.post("/import/:id/apply", async (c) => {
-    const body = (await c.req.json().catch(() => null)) as { fobUid?: unknown } | null;
-    if (!body || typeof body.fobUid !== "string") return c.json({ error: 'Body must be {"fobUid": "..."}' }, 400);
-    const res = applyBatch(db, Number(c.req.param("id")), body.fobUid, now(), config.timezone);
+    const body = (await c.req.json().catch(() => null)) as { fobUid?: unknown; resolutions?: unknown } | null;
+    if (!body || typeof body.fobUid !== "string") return c.json({ error: 'Body must be {"fobUid": "...", "resolutions": {...}}' }, 400);
+    const resolutions = parseResolutions(body.resolutions);
+    if (!resolutions) return c.json({ error: 'resolutions must be {"<conflict key>": "panel" | "sheet"}' }, 400);
+    const res = applyBatch(db, Number(c.req.param("id")), body.fobUid, now(), config.timezone, resolutions);
+    if (res.kind === "applied") onDataChanged?.();
     switch (res.kind) {
       case "applied":
       case "already_applied":
@@ -46,6 +61,8 @@ export function importRoutes(db: Database, config: Config, now: () => Date) {
         return c.json({ ...res, error: "A newer workbook was uploaded; apply that one" }, 409);
       case "stale":
         return c.json({ ...res, error: "The data changed since this preview; upload the workbook again" }, 409);
+      case "unresolved":
+        return c.json({ ...res, error: `Choose "keep panel" or "use sheet" for ${res.keys.length} conflict(s) first` }, 409);
     }
   });
 

@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+# tech-access-screen-helper: follows the hub's panel stream (Server-Sent Events) and switches the
+# screen on for a fob tap, and off when the hub says the panel has been idle. swayidle only sees
+# touches, so this covers the fob. Reconnects every 5 s if the hub is away.
+set -u
+. "${TECH_ACCESS_KIOSK_ENV:-/etc/tech-access/kiosk.env}"
+while true; do
+  curl -sN "$HUB_URL/api/panel/stream" 2>/dev/null | {
+    ev=""
+    while IFS= read -r line; do
+      line=${line%$'\r'}
+      case $line in
+        "event: "*) ev=${line#event: } ;;
+        "data: "*)
+          d=${line#data: }
+          case $ev in
+            tap) wlopm --on '*' >/dev/null 2>&1 ;;
+            screen)
+              case $d in
+                *'"on":false'*'"why":"idle"'*) wlopm --off '*' >/dev/null 2>&1 ;;
+                *'"on":true'*) wlopm --on '*' >/dev/null 2>&1 ;;
+              esac
+              ;;
+          esac
+          ;;
+      esac
+    done
+  }
+  sleep 5
+done

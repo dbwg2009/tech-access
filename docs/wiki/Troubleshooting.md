@@ -69,6 +69,19 @@ cat /sys/class/rtc/rtc0/charging_voltage     # 3000000 = charging
 
 Day passes use the clock. A wrong date means passes show "expired" or "isn't valid yet".
 
+## Desk panel
+
+| Problem | Check / fix |
+| --- | --- |
+| Black screen, nothing on touch or fob | Is the Pi on? Over SSH: `systemctl status getty@tty1`, `journalctl -t tech-access-kiosk -b`. Re-run `sudo ./06-kiosk.sh` and reboot. |
+| "Starting the desk panel…" never goes away | The hub isn't answering: `curl -s http://127.0.0.1:8080/api/health`, then [Hub won't start](#hub-wont-start). The page opens the panel by itself once the hub is up. |
+| The panel shows an old version after an update | It reloads by itself when the hub restarts. If not: `sudo pkill chromium` (it restarts in 2 s). |
+| Fob does nothing, touch works | Reader problem. See [the desk panel page](Desk-Panel.md#if-the-reader-isnt-found). |
+| Fob gives "Ask a staff member" | The reason is on screen. **Admin → Event log** shows the same (*Fob refused*). |
+| Screen never turns off | Something keeps touching it, or a card was left open (they close after 30 s / 90 s). `journalctl -t tech-access-kiosk -b \| grep -i swayidle` |
+| Restart / reboot from the admin menu does nothing | `journalctl -u tech-access-hub -n 20` shows `systemctl ... failed`. Re-run `sudo ./06-kiosk.sh` (installs the polkit rule). Check `ls /etc/polkit-1/rules.d/`. |
+| Box shows "offline" / "never seen" | Expected until the boxes exist (week 5). Afterwards: the box isn't sending heartbeats; see [MQTT](#mqtt). |
+
 ## MQTT
 
 - Test the broker: `mosquitto_pub -h 127.0.0.1 -u hub -P "$(sudo cat /etc/tech-access/mqtt/hub.password)" -t test -m hi`

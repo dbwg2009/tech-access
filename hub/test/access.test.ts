@@ -160,3 +160,45 @@ describe("admin and software update", () => {
     expect(canApplySoftwareUpdate(null, null).allow).toBe(false);
   });
 });
+
+describe("show mode (decision 2026-11-16)", () => {
+  const SHOW: AccessSettings = { studentsDisabled: false, showMode: true };
+  test("any box opens with no fob at all", () => {
+    expect(open(null, null, box(4), SHOW)).toEqual({ allow: true, reason: "Show mode" });
+  });
+  test("overrides level, fob status and disable-all-students for boxes", () => {
+    expect(open(fob(), person({ level: 1 }), box(4), SHOW).allow).toBe(true);
+    expect(open(fob({ status: "Lost" }), person(), box(4), SHOW).allow).toBe(true);
+    expect(open(fob(), person(), box(4), { studentsDisabled: true, showMode: true }).allow).toBe(true);
+  });
+  test("does not affect kit: Take kit still needs clearance", () => {
+    expect(take(fob(), person({ level: 1 }), kit({ required_level: 3 }), SHOW).allow).toBe(false);
+    expect(take(null, null, kit(), SHOW).allow).toBe(false);
+  });
+  test("off by default: normal rules", () => {
+    expect(open(null, null, box(1), { studentsDisabled: false, showMode: false }).allow).toBe(false);
+  });
+});
+
+import { decideCrewCard } from "../src/access";
+import { firstName } from "../src/names";
+
+describe("crew card and names", () => {
+  test("decideCrewCard uses the shared checks only", () => {
+    expect(decideCrewCard(fob(), person({ level: 1 }), OPEN, NOW)).toEqual({ allow: true, reason: "OK" });
+    expect(decideCrewCard(fob(), person(), DISABLED, NOW)).toEqual({ allow: false, reason: "Students are disabled right now" });
+    expect(decideCrewCard(fob({ status: "Lost" }), person(), OPEN, NOW).reason).toBe("This fob is Lost");
+    expect(decideCrewCard(null, null, OPEN, NOW).reason).toBe("Fob not recognised");
+  });
+  test("deny reasons use first names", () => {
+    expect(open(fob(), person({ name: "Ada Lovelace", status: "Disabled" })).reason).toBe("Ada is Disabled");
+  });
+  test("firstName: first word, or title + surname for staff", () => {
+    expect(firstName("Ada Lovelace")).toBe("Ada");
+    expect(firstName("Mrs Ritter")).toBe("Mrs Ritter");
+    expect(firstName("Mr. John Smith")).toBe("Mr. Smith");
+    expect(firstName("Dr")).toBe("Dr");
+    expect(firstName("  ")).toBe("");
+    expect(firstName(null)).toBe("");
+  });
+});

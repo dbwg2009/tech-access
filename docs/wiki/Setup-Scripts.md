@@ -32,6 +32,11 @@ Always run the scripts from `/opt/tech-access/pi`. The certificate-renewal timer
 | 3 | `sudo ./03-mosquitto.sh` | yes (installs) | no |
 | 4 | `sudo ./04-ca.sh` | no | no |
 | 5 | `sudo ./05-bun-hub.sh` | yes (Bun, clone) | no |
+| 6 | `sudo ./06-kiosk.sh` | yes (installs) | after step 7 |
+| 7 | `sudo ./07-reader.sh` | no | **yes** (`sudo reboot`) |
+
+Steps 6 and 7 are the desk panel (weeks 3–4). Run them when the screen and the PN532 are
+connected; the hub works without them. One reboot after both is enough.
 
 If your setup internet comes over **Ethernet**, do step 2 last.
 
@@ -113,7 +118,9 @@ Check: `systemctl list-timers tech-access-cert-renew.timer`
 - Clones the repo to `/opt/tech-access`, or updates it to the latest `REPO_REF` (default `main`).
 - Runs `bun install --frozen-lockfile --production`. Everything comes from `hub/bun.lock`; the
   `.xlsx` library is vendored in `hub/vendor/`, so it doesn't need its own website.
-- Writes `/etc/tech-access/hub.toml` (database path, port 8080, timezone).
+- Builds the desk panel (`bun run build`: `hub/panel/` → `hub/public/panel/`) when the checkout
+  changed. The built files aren't in git.
+- Writes `/etc/tech-access/hub.toml` (database path, port 8080, timezone, `reader_device`).
 - Installs and starts `tech-access-hub.service` (`Restart=always`, restarts forever).
 - Calls `/api/health` and prints the result.
 
@@ -122,6 +129,39 @@ Expected at the end:
 ```
     ok: {"name":"tech-access hub","version":"0.1.0","schemaVersion":1,"db":"ok",...}
 ```
+
+## 07-reader.sh: the desk fob reader
+
+The PN532 is on GPIO14/15, which on a Pi 5 is `UART0` = **`/dev/ttyAMA0`**
+(wiring: [Hardware](Hardware.md#desk-fob-reader-pn532)).
+
+| Does | Why |
+| --- | --- |
+| Adds `dtparam=uart0=on` to `/boot/firmware/config.txt` | UART0 is off by default on a Pi 5. |
+| Comments out `enable_uart=1` and `dtparam=uart0_console=on` if present | On a Pi 5 these put kernel messages on GPIO14/15, i.e. into the PN532. |
+| Removes `console=serial0,…` / `console=ttyAMA0,…` from `/boot/firmware/cmdline.txt` (keeps a copy as `cmdline.txt.before-07-reader`) | No login console on the reader's port. The debug header (`ttyAMA10`) is left alone. |
+| Masks `serial-getty@ttyAMA0` and `serial-getty@serial0` | Same. |
+| Adds `techaccess` to `dialout`, restarts the hub | So the hub can open the port. |
+
+**Then reboot.** Check: `ls -l /dev/ttyAMA0` and `curl -s http://127.0.0.1:8080/api/health`
+(`"reader": … "state":"ok"`). If `/dev/ttyAMA0` doesn't appear, try `dtoverlay=uart0-pi5`
+instead of `dtparam=uart0=on` in `config.txt` (both are in the Raspberry Pi docs).
+
+## 06-kiosk.sh: the desk panel's screen
+
+| Does | Why |
+| --- | --- |
+| Installs `labwc`, `chromium`, `swayidle`, `wlopm`, `polkitd` | Trixie package names (`chromium-browser` is now only a transitional package). labwc is the Wayland compositor Pi OS itself uses. |
+| Creates the user `kiosk` (password locked; groups video, render, input) | The panel never runs as you or as root. |
+| Auto-login on tty1 (`getty@tty1` drop-in); `~kiosk/.bash_profile` runs `labwc` | If labwc ever exits, getty logs in again and it comes back. |
+| labwc autostart: `swayidle`, `tech-access-screen-helper`, `tech-access-kiosk-browser` | Screen off after 5 min without a touch; a fob tap turns it on; Chromium is restarted if it exits. |
+| Chromium in kiosk mode on `/panel/?kiosk=1` with no first-run, translate, pinch or swipe-back, and a clean restart after a crash | Nothing for staff to dismiss. A local start page waits for the hub first, so a slow boot never leaves an error page. |
+| Installs `/etc/polkit-1/rules.d/50-tech-access.rules` | Lets the admin menu restart the hub and reboot the Pi, and nothing else ([the rule](../../pi/polkit/50-tech-access.rules)). |
+
+**Then reboot.** Logs: `journalctl -t tech-access-kiosk -b`. To get a shell on the Pi's own
+screen, use `Ctrl+Alt+F2` with a keyboard plugged in; the panel stays on tty1.
+
+The full test list for the real hardware is on [the desk panel page](Desk-Panel.md#first-test-on-the-real-hardware).
 
 ## Re-running
 

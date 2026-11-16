@@ -8,6 +8,7 @@
 6. [Day to day](Day-to-Day.md)
 7. [Troubleshooting](Troubleshooting.md)
 8. [Rebuild and handover](Rebuild-and-Handover.md)
+9. [The desk panel](Desk-Panel.md)
 
 ---
 

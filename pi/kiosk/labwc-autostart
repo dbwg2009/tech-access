@@ -1,0 +1,10 @@
+# labwc autostart for the desk panel. Written by 06-kiosk.sh from pi/kiosk/labwc-autostart.
+# Logs: journalctl -t tech-access-kiosk
+# Screen off after @SCREEN_OFF_SECONDS@ s with no touch; any touch turns it back on.
+systemd-cat -t tech-access-kiosk swayidle -w \
+  timeout @SCREEN_OFF_SECONDS@ '/usr/local/bin/tech-access-screen off' \
+  resume '/usr/local/bin/tech-access-screen on' &
+# Fob taps wake the screen; the hub's idle timer turns it off after a fob-only wake.
+systemd-cat -t tech-access-kiosk /usr/local/bin/tech-access-screen-helper &
+# Chromium, restarted if it ever exits.
+systemd-cat -t tech-access-kiosk /usr/local/bin/tech-access-kiosk-browser &

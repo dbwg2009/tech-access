@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+# tech-access-kiosk-browser: Chromium in kiosk mode for the desk panel. Restarts it whenever it
+# exits or crashes. Started by labwc's autostart for the kiosk user (06-kiosk.sh).
+set -u
+. "${TECH_ACCESS_KIOSK_ENV:-/etc/tech-access/kiosk.env}"
+
+PROFILE="$HOME/.local/share/tech-access-chromium"
+mkdir -p "$PROFILE"
+
+while true; do
+  # After a crash Chromium offers to "restore pages". Mark the last run as clean so it doesn't.
+  sed -i 's/"exited_cleanly":false/"exited_cleanly":true/; s/"exit_type":"Crashed"/"exit_type":"Normal"/' \
+    "$PROFILE/Default/Preferences" 2>/dev/null || true
+  # start.html waits for the hub, then opens the panel, so a slow hub start never leaves an
+  # error page on screen.
+  chromium "file:///usr/local/share/tech-access-kiosk/start.html" \
+    --kiosk \
+    --ozone-platform=wayland \
+    --user-data-dir="$PROFILE" \
+    --no-first-run --no-default-browser-check \
+    --noerrdialogs --disable-infobars --disable-session-crashed-bubble \
+    --disable-translate --disable-features=Translate,TranslateUI,OverscrollHistoryNavigation \
+    --disable-pinch --overscroll-history-navigation=0 \
+    --disable-background-networking --disable-sync --disable-component-update \
+    --check-for-update-interval=31536000 --password-store=basic \
+    --hide-scrollbars --lang=en-GB
+  echo "chromium exited ($?); restarting in 2 s"
+  sleep 2
+done

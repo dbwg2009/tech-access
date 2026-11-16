@@ -56,6 +56,11 @@ The rest of the sheet is human help text. Ignore it on import; write it back unc
 | Notes | text | |
 | Name (auto) | export only | Person's name, for humans. |
 
+A day pass issued on the desk panel (weeks 3–4) uses a `Spare` fob (or yesterday's day pass):
+Role becomes `Day pass`, Status `Active`, Level as chosen, Issued today, and **Notes** gets
+`Day pass: <company / reason> (issued by <first name>)`. No new column is needed, so older
+workbooks still import; the event log keeps the company / reason and the issuing fob as fields.
+
 Fob lifecycle: issued at Level 1; a lost fob is set to Lost (never reused); £2 charge from a person's second lost fob (the hub counts Lost fobs per person and shows it on the panel).
 
 ## Sheet: `Kit`
@@ -89,6 +94,16 @@ Every item has a location (Box ID + Slot) in the data model from day one, ready 
 | Offline unlock (min) | integer ≥ 0 | Minutes after the Pi becomes unreachable before the box fails open. Default 5. |
 | Notes | text | |
 | Last seen (auto) | export only | Last MQTT heartbeat. |
+
+## Changes made on the desk panel
+
+The admin menu can enrol fobs, add people, mark fobs lost / revoked and issue day passes. Each
+change is remembered per sheet, row and field until the next **export**. If an import would
+overwrite or remove one of them, the preview lists it as a **conflict**; the admin picks
+"keep panel" (the default on screen) or "use sheet" for each, and the hub refuses to apply until
+every conflict has a choice. Exporting marks every panel change up to that moment as included,
+so re-importing that exported file never conflicts. Rule of thumb: **export after using the
+admin menu, then edit that file.**
 
 ## Never in the workbook
 
