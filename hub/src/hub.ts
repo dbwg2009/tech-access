@@ -6,6 +6,7 @@ import type { Config } from "./config";
 import type { Bus } from "./mqtt/bus";
 import { BoxLink } from "./mqtt/boxes";
 import { Admin, type Runner } from "./panel/admin";
+import { Editor } from "./panel/editor";
 import { Panel, type PanelTimings } from "./panel/panel";
 import { PanelStream } from "./panel/stream";
 import type { FobReader } from "./reader/types";
@@ -52,13 +53,15 @@ export function buildHub(d: HubDeps) {
   };
 
   const admin = new Admin(panel, { run: d.run, backupDir: d.backupDir, onDataChanged: () => boxes.publishRetained() });
-  const app = createApp({ db: d.db, config: d.config, now, startedAt, reader: d.reader, panel, admin, onDataChanged: dataChanged });
+  const editor = new Editor(panel, () => boxes.publishRetained());
+  const app = createApp({ db: d.db, config: d.config, now, startedAt, reader: d.reader, panel, admin, editor, onDataChanged: dataChanged });
 
   let timers: ReturnType<typeof setInterval>[] = [];
   return {
     app,
     panel,
     admin,
+    editor,
     boxes,
     stream,
     dataChanged,

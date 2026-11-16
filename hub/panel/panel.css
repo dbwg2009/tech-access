@@ -219,3 +219,49 @@ button { font: inherit; color: inherit; border: 0; cursor: pointer; }
 
 /* development only (fake_reader = true): sits in the empty middle of the top bar */
 .devkey { position: absolute; left: 50%; top: 10px; transform: translateX(-50%); z-index: 50; height: 52px; font-size: 18px; padding: 0 16px; border-radius: 12px; background: #4b2a6b; border: 2px dashed #b48ae0; }
+
+/* ---------- editor: people, kit, boxes, spare fobs ---------- */
+.tabs { display: flex; gap: 10px; align-items: center; flex: none; }
+.tabs .btn { min-height: 64px; font-size: 24px; padding: 0 22px; }
+.tabs .btn.on { background: var(--blue); border-color: var(--blue); }
+.search { display: flex; gap: 12px; align-items: center; flex: none; }
+.search .field { width: 560px; min-height: 64px; }
+.rows { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; overscroll-behavior: contain; }
+.erow {
+  display: grid; gap: 16px; align-items: center; text-align: left; width: 100%;
+  min-height: 68px; padding: 8px 18px; border-radius: 12px; background: var(--panel); border: 2px solid var(--line); font-size: 23px;
+}
+.erow:active { filter: brightness(1.3); }
+.erow.static:active { filter: none; }
+.erow.dim { opacity: 0.55; }
+.erow b { font-size: 25px; }
+.rows.people .erow { grid-template-columns: 2.2fr 1.8fr 1.4fr 1.6fr 0.9fr; }
+.rows.kit .erow { grid-template-columns: 2fr 1.2fr 1.6fr 2fr 0.5fr; }
+.rows.boxes .erow { grid-template-columns: 2fr 1.6fr 1fr 1.6fr 0.8fr; }
+.rows.spares .erow { grid-template-columns: 0.8fr 1.4fr 2fr 3.2fr; }
+.erow .acts, .fobrow .acts { display: flex; gap: 8px; justify-content: flex-end; }
+.erow .acts .btn, .fobrow .acts .btn { min-height: 56px; font-size: 20px; padding: 0 14px; }
+.status-Active { color: #7fe0a6; } .status-Disabled { color: var(--warn); } .status-Left { color: var(--muted); } .status-out { color: var(--warn); font-weight: 700; }
+.blue-tile { border-color: var(--blue); background: #1b2a42; }
+.pick.fobs { flex: 1; background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px 18px; }
+.pick.fobs h3 { margin: 0; font-size: 20px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; }
+.fobcol { display: flex; flex-direction: column; gap: 8px; overflow-y: auto; }
+.fobrow { display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; border-radius: 12px; background: var(--panel-2); font-size: 23px; }
+.fobrow.dim { opacity: 0.5; }
+.fobrow .acts { justify-content: flex-start; }
+.waiting { display: flex; align-items: center; gap: 16px; font-size: 24px; }
+.fob.small { width: 72px; height: 72px; font-size: 18px; border-width: 4px; }
+
+/* crew card with five buttons (student admin): keep it all on screen */
+.card { gap: 12px; }
+.card .btn { min-height: 80px; }
+.who .meta { font-size: 26px; }
+/* person form beside the fobs column */
+.form.compact { grid-template-columns: 150px 1fr; }
+.form.compact .seg { gap: 8px; }
+.form.compact .seg .btn { min-width: 68px; padding: 0 16px; }
+.pick.fobs { flex: none; width: 380px; }
+.card .btn { min-height: 76px; }
+.card .who { padding: 16px 22px; }
+.card .who .name { font-size: 56px; }
+.fobrow .acts .btn { padding: 0 12px; font-size: 18px; white-space: nowrap; }

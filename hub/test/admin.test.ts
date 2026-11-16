@@ -110,34 +110,30 @@ describe("students", () => {
   });
 });
 
-describe("fob lost / revoked", () => {
-  test("confirmed, Ended = today, panel change recorded, £2 note on the second lost fob", async () => {
+describe("fob lost / revoked (from a profile: no confirm tap)", () => {
+  test("done straight away, Ended = today, panel change recorded, £2 note on the second lost fob", async () => {
     const h = setup();
     h.db.query("INSERT INTO fobs (fob_uid, person_id, role, status, issued, ended) VALUES ('0A0A0A0A', 'P001', 'Standard', 'Lost', '2026-01-01', '2026-02-01')").run();
     const s = admin(h);
-    const list = (await h.req("GET", `/api/admin/fobs?session=${s}`)).json.fobs;
-    expect(list.find((f: { fob_uid: string }) => f.fob_uid === UID.ada)).toMatchObject({ name: "Ada", lostBefore: 1 });
-    expect((await h.req("POST", "/api/admin/fob-status", { session: s, uid: UID.ada, status: "Lost" })).json.confirm).toBe("tap");
-    h.tap(UID.danielAdmin);
-    expect(confirmEvents(h).at(-1)).toMatchObject({ ok: true, message: "Fob marked lost. This is their second lost fob: £2 charge", charge: true });
+    expect((await h.req("GET", `/api/admin/edit/person?session=${s}&id=P001`)).json.lostFobs).toBe(1);
+    const r = (await h.req("POST", "/api/admin/fob-status", { session: s, uid: UID.ada, status: "Lost" })).json;
+    expect(r).toMatchObject({ ok: true, message: "Fob marked lost. This is their second lost fob: £2 charge", charge: true });
     expect(getFob(h.db, UID.ada)).toMatchObject({ status: "Lost", ended: "2026-11-16" });
     const changes = h.db.query<{ field: string; fob_uid: string }, []>("SELECT field, fob_uid FROM panel_changes ORDER BY id").all();
     expect(changes).toEqual([
-      { field: "status", fob_uid: UID.danielAdmin },
-      { field: "ended", fob_uid: UID.danielAdmin },
+      { field: "status", fob_uid: UID.ritterAdmin },
+      { field: "ended", fob_uid: UID.ritterAdmin },
     ]);
-    expect(actions(h)[0]).toMatchObject({ action: "fob_lost", uid: UID.ada, openedBy: UID.ritterAdmin, confirmedBy: UID.danielAdmin });
-    // Ada's fob no longer opens a card, and is off the boxes' lists
+    expect(actions(h)[0]).toMatchObject({ action: "fob_lost", uid: UID.ada, openedBy: UID.ritterAdmin, confirmedBy: null });
     h.tap(UID.ada);
     expect(h.events.at(-1)).toMatchObject({ event: "denied", data: { reason: "This fob is Lost" } });
     expect(JSON.parse(h.bus.retained.get("box/BOX-01/fobs")!).fobs.map((f: { uid: string }) => f.uid)).not.toContain(UID.ada);
   });
 
-  test("revoke; refuses one that's already lost", async () => {
+  test("revoke; refuses one that's already revoked", async () => {
     const h = setup();
     const s = admin(h);
-    await h.req("POST", "/api/admin/fob-status", { session: s, uid: UID.cal, status: "Revoked" });
-    h.tap(UID.ritterAdmin);
+    expect((await h.req("POST", "/api/admin/fob-status", { session: s, uid: UID.cal, status: "Revoked" })).json.ok).toBe(true);
     expect(getFob(h.db, UID.cal)?.status).toBe("Revoked");
     expect((await h.req("POST", "/api/admin/fob-status", { session: s, uid: UID.cal, status: "Lost" })).json.reason).toBe("That fob is already Revoked");
   });
@@ -459,9 +455,14 @@ describe("event log wording for admin actions", () => {
     const h = setup();
     const s = admin(h, UID.ritterAdmin);
     await h.req("POST", "/api/admin/fob-status", { session: s, uid: UID.cal, status: "Lost" });
-    h.tap(UID.danielAdmin);
     await h.req("POST", "/api/admin/enrol", { session: s, uid: "01020304", personId: "P001" });
+    await h.req("POST", "/api/admin/show-mode", { session: s, on: true });
+    h.tap(UID.danielAdmin);
     const texts = (await h.req("GET", `/api/admin/events?session=${s}`)).json.events.map((e: { text: string }) => e.text);
-    expect(texts).toEqual(["Mrs Ritter enrolled a fob for Ada", "Mrs Ritter marked Cal's fob lost (confirmed by Daniel)"]);
+    expect(texts).toEqual([
+      "Mrs Ritter turned show mode on (confirmed by Daniel)",
+      "Mrs Ritter enrolled a fob for Ada",
+      "Mrs Ritter marked Cal's fob lost",
+    ]);
   });
 });

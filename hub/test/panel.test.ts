@@ -229,10 +229,27 @@ describe("crew actions", () => {
     expect((await h.req("POST", "/api/panel/sign", { session: h.sid() })).json.reason).toBe("This fob is Lost");
   });
 
-  test("crew routes refuse an admin session and vice versa", async () => {
+  test("admin fob: crew card too; sees every item and box; a student admin can sign in", async () => {
+    const h = setup();
+    h.tap(UID.danielAdmin); // student, Admin fob
+    expect(h.hub.panel.view()).toMatchObject({ kind: "admin", name: "Daniel", canSignIn: true, signedIn: false });
+    expect((await h.req("GET", `/api/panel/kit?session=${h.sid()}`)).json.take.map((k: { kit_id: string }) => k.kit_id).sort()).toEqual(["K001", "K002", "K003", "K004"]);
+    expect((await h.req("GET", `/api/panel/boxes?session=${h.sid()}`)).json.boxes).toHaveLength(2);
+    expect((await h.req("POST", "/api/panel/sign", { session: h.sid() })).json.message).toBe("Signed in");
+    expect((await h.req("POST", "/api/panel/take", { session: h.sid(), kitId: "K002" })).json.ok).toBe(true);
+  });
+
+  test("staff and hire techs never sign in (any fob); students and guests do", async () => {
     const h = setup();
     h.tap(UID.ritterAdmin);
-    expect((await h.req("POST", "/api/panel/sign", { session: h.sid() })).status).toBe(403);
+    expect(h.hub.panel.view()).toMatchObject({ kind: "admin", canSignIn: false });
+    expect((await h.req("POST", "/api/panel/sign", { session: h.sid() })).json.reason).toBe("Staff and hire techs don't sign in");
+    h.tap(UID.hire);
+    expect(h.hub.panel.view()?.canSignIn).toBe(false);
+    expect((await h.req("POST", "/api/panel/sign", { session: h.sid() })).json.ok).toBe(false);
+    h.tap(UID.dayPass);
+    expect(h.hub.panel.view()?.canSignIn).toBe(true);
+    expect(h.log("sign_in")).toEqual([]);
   });
 });
 

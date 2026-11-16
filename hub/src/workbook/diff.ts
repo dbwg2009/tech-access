@@ -43,13 +43,15 @@ export interface SheetDiff {
  * screen) or "sheet" (use the workbook) for each one before apply.
  */
 export interface Conflict {
-  /** `${sheet}/${id}/${column header}` for a field, `${sheet}/${id}/*` for a removal. */
+  /** `${sheet}/${id}/${column header}` for a field, `${sheet}/${id}/*` for a removal or restore. */
   key: string;
   sheet: SheetKey;
   sheetName: string;
   id: string;
   label: string | null;
-  kind: "change" | "removal";
+  /** change: a field; removal: the sheet drops a row the panel changed or added;
+   *  restore: the sheet brings back a row the panel removed. */
+  kind: "change" | "removal" | "restore";
   column: string | null;
   /** Value on the hub now (set on the panel). For a removal, null. */
   panel: string | number | null;
@@ -184,6 +186,24 @@ function findConflicts(sheets: Record<SheetKey, SheetDiff>, changes: PanelChange
           byFob: latest(hits).fob_uid,
         });
       }
+    }
+    for (const a of sheets[def.key].adds) {
+      if (!a.restores) continue;
+      const hits = mine.filter((c) => c.row_id === a.id && c.field === "archived");
+      if (!hits.length) continue;
+      out.push({
+        key: `${def.key}/${a.id}/*`,
+        sheet: def.key,
+        sheetName: def.name,
+        id: a.id,
+        label: norm(a.values[def.columns.find((c) => c.field === def.labelField)!.header]) as string | null,
+        kind: "restore",
+        column: null,
+        panel: null,
+        sheetValue: null,
+        changedAt: latest(hits).ts,
+        byFob: latest(hits).fob_uid,
+      });
     }
     for (const r of sheets[def.key].removals) {
       const hits = mine.filter((c) => c.row_id === r.id);

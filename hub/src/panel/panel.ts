@@ -66,8 +66,10 @@ export interface Pending {
 }
 
 export interface Capture {
-  purpose: "enrol" | "day_pass";
+  purpose: "enrol" | "day_pass" | "add_fob";
   expiresAt: number;
+  /** add_fob: the person the tapped fob goes to. */
+  personId?: string;
 }
 
 export interface Session {
@@ -79,6 +81,8 @@ export interface Session {
   lastTouch: number;
   pending: Pending | null;
   capture: Capture | null;
+  /** The admin editor is open: a fob tap finds that fob's owner instead of opening a new card. */
+  find: boolean;
 }
 
 /** Runs a confirmed risky action. `confirmUid` is the admin fob that confirmed it. */
@@ -94,6 +98,14 @@ export interface PanelDeps {
   readerStatus?: () => (ReaderStatus & { kind: string }) | null;
   system?: () => SystemInfo;
   startedAt?: number;
+}
+
+/**
+ * Decision 2026-11-16 (Daniel): only students and guests (day passes) sign in. Staff and hire techs
+ * never do, whatever their fob (an admin fob of a student still can).
+ */
+export function canSignIn(person: Pick<Person, "type"> | null): boolean {
+  return !person || person.type === "Student";
 }
 
 const BOX_STATUS_WORDS: Record<BoxStatus, string> = { locked: "locked", open: "open", offline: "offline", never_seen: "never seen" };
@@ -112,7 +124,8 @@ export class Panel {
   private screenOn = true;
   private lastActivity: number;
   private readonly confirmers = new Map<string, Confirmer>();
-  private captureFn: ((s: Session, uid: string, purpose: Capture["purpose"]) => void) | null = null;
+  private captureFn: ((s: Session, uid: string, capture: Capture) => void) | null = null;
+  private findFn: ((s: Session, uid: string) => void) | null = null;
 
   constructor(d: PanelDeps) {
     this.db = d.db;
@@ -154,10 +167,14 @@ export class Panel {
     if (s?.pending && now < s.pending.expiresAt) return this.confirmTap(s, s.pending, uid);
     if (s?.capture && now < s.capture.expiresAt && this.captureFn) {
       const fn = this.captureFn;
-      const purpose = s.capture.purpose;
+      const capture = s.capture;
       s.capture = null;
       s.lastTouch = now;
-      return fn(s, uid, purpose);
+      return fn(s, uid, capture);
+    }
+    if (s?.kind === "admin" && s.find && this.findFn) {
+      s.lastTouch = now;
+      return this.findFn(s, uid);
     }
     this.openFor(uid);
   }
@@ -182,7 +199,7 @@ export class Panel {
       return;
     }
     const now = this.ms();
-    this.session = { id: crypto.randomUUID(), kind, fobUid: uid, personId: fob!.person_id, openedAt: now, lastTouch: now, pending: null, capture: null };
+    this.session = { id: crypto.randomUUID(), kind, fobUid: uid, personId: fob!.person_id, openedAt: now, lastTouch: now, pending: null, capture: null, find: false };
     this.publishSession();
   }
 
@@ -233,7 +250,6 @@ export class Panel {
       pending: s.pending ? { id: s.pending.id, label: s.pending.label, expiresAt: new Date(s.pending.expiresAt).toISOString() } : null,
       capture: s.capture ? { purpose: s.capture.purpose, expiresAt: new Date(s.capture.expiresAt).toISOString() } : null,
     };
-    if (s.kind === "admin") return base;
     const key = holderKey(s.personId, s.fobUid);
     return {
       ...base,
@@ -241,6 +257,7 @@ export class Panel {
       level: fob ? effectiveLevel(fob, person) : null,
       specialism: person?.specialism ?? null,
       type: person?.type ?? "Guest",
+      canSignIn: canSignIn(person),
       signedIn: isSignedIn(this.db, key),
       kitOut: this.kitOutFor(key).map((k) => ({ kit_id: k.kit_id, item: k.item })),
     };
@@ -257,8 +274,12 @@ export class Panel {
     this.confirmers.set(action, fn);
   }
 
-  setCaptureHandler(fn: (s: Session, uid: string, purpose: Capture["purpose"]) => void): void {
+  setCaptureHandler(fn: (s: Session, uid: string, capture: Capture) => void): void {
     this.captureFn = fn;
+  }
+
+  setFindHandler(fn: (s: Session, uid: string) => void): void {
+    this.findFn = fn;
   }
 
   /** A risky action: don't run it yet, wait for an admin fob tap within `confirmMs`. */
@@ -277,11 +298,11 @@ export class Panel {
     return ok("Cancelled");
   }
 
-  startCapture(s: Session, purpose: Capture["purpose"]): Result {
+  startCapture(s: Session, purpose: Capture["purpose"], personId?: string): Result {
     s.pending = null;
-    s.capture = { purpose, expiresAt: this.ms() + this.t.captureMs };
+    s.capture = { purpose, expiresAt: this.ms() + this.t.captureMs, ...(personId ? { personId } : {}) };
     this.publishSession();
-    return ok(purpose === "enrol" ? "Tap the new fob" : "Tap a spare fob");
+    return ok(purpose === "day_pass" ? "Tap a spare fob" : "Tap the new fob");
   }
 
   private confirmTap(s: Session, p: Pending, uid: string): void {
@@ -323,6 +344,7 @@ export class Panel {
   signInOut(s: Session): Result {
     const bad = this.recheck(s);
     if (bad) return bad;
+    if (!canSignIn(getPerson(this.db, s.personId))) return no("Staff and hire techs don't sign in");
     const key = holderKey(s.personId, s.fobUid);
     const type = isSignedIn(this.db, key) ? "sign_out" : "sign_in";
     this.log(type, s);

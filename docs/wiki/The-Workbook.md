@@ -49,8 +49,10 @@ TECHUPDATE stick opens the preview by itself.
 
 ### Changes made on the panel (conflicts)
 
-The admin menu changes the same data as the workbook (enrol, lost / revoke, day passes). The hub
-remembers every such change until the next **export**. If your workbook would undo one, the
+Since 16 Nov 2026 the **panel is the main copy**: everything in this workbook can be edited on the
+desk panel (admin → **People, kit & boxes**). Use the workbook for big changes, as a readable
+backup, and to rebuild a hub. The hub
+remembers every such change until the next **export**. If your workbook would undo one (or bring back a row removed on the panel), the
 preview lists it as a **conflict** and you choose **Keep panel** (the default) or **Use
 workbook** for each. Apply is refused until every conflict has a choice.
 

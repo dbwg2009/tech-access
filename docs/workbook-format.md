@@ -97,9 +97,11 @@ Every item has a location (Box ID + Slot) in the data model from day one, ready 
 
 ## Changes made on the desk panel
 
-The admin menu can enrol fobs, add people, mark fobs lost / revoked and issue day passes. Each
+Since 16 Nov 2026 the desk panel is the **main copy**: its **People, kit & boxes** editor changes
+every sheet (people, fobs, kit, boxes), and the workbook is the readable backup and the tool for
+bulk changes. The admin menu also enrols fobs and issues day passes. Each
 change is remembered per sheet, row and field until the next **export**. If an import would
-overwrite or remove one of them, the preview lists it as a **conflict**; the admin picks
+overwrite or remove one of them, or bring back a row the panel removed, the preview lists it as a **conflict**; the admin picks
 "keep panel" (the default on screen) or "use sheet" for each, and the hub refuses to apply until
 every conflict has a choice. Exporting marks every panel change up to that moment as included,
 so re-importing that exported file never conflicts. Rule of thumb: **export after using the

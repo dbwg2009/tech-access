@@ -65,35 +65,35 @@ export function panelRoutes(panel: Panel, opts: { fakeReader: boolean }) {
   });
 
   r.post("/panel/sign", async (c) => {
-    const s = panel.get((await body(c)).session, "crew");
+    const s = panel.get((await body(c)).session);
     return send(c, "ok" in s ? s : panel.signInOut(s));
   });
 
   r.get("/panel/kit", (c) => {
-    const s = panel.get(c.req.query("session"), "crew");
+    const s = panel.get(c.req.query("session"));
     return "ok" in s ? send(c, s) : c.json(panel.kitLists(s));
   });
 
   r.post("/panel/take", async (c) => {
     const b = await body(c);
-    const s = panel.get(b.session, "crew");
+    const s = panel.get(b.session);
     return send(c, "ok" in s ? s : panel.take(s, b.kitId));
   });
 
   r.post("/panel/return", async (c) => {
     const b = await body(c);
-    const s = panel.get(b.session, "crew");
+    const s = panel.get(b.session);
     return send(c, "ok" in s ? s : panel.giveBack(s, b.kitId));
   });
 
   r.get("/panel/boxes", (c) => {
-    const s = panel.get(c.req.query("session"), "crew");
+    const s = panel.get(c.req.query("session"));
     return "ok" in s ? send(c, s) : c.json({ boxes: panel.boxList(s) });
   });
 
   r.post("/panel/open", async (c) => {
     const b = await body(c);
-    const s = panel.get(b.session, "crew");
+    const s = panel.get(b.session);
     return send(c, "ok" in s ? s : panel.openBox(s, b.boxId));
   });
 
