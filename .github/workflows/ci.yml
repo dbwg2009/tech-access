@@ -1,0 +1,65 @@
+# Build and test on every push and pull request:
+#   firmware: box_core rules on the native platform, then both ESP32 builds (the binaries are
+#             kept as artifacts: the wt32-eth01 one is what you upload for an OTA update).
+#   hub:      bun test + typecheck in hub/, then the box simulator's vector and end-to-end tests
+#             (real Mosquitto, the Pi's ACL file, the hub and two simulated boxes).
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  firmware:
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: firmware
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Cache PlatformIO (platform, toolchain, libraries)
+        uses: actions/cache@v4
+        with:
+          path: ~/.platformio
+          key: pio-${{ runner.os }}-${{ hashFiles('firmware/platformio.ini') }}
+      - name: Install PlatformIO
+        run: pip install platformio==6.2.0
+      - name: Rules (native tests, shared vectors)
+        run: pio test -e native
+      - name: Build wt32-eth01 and esp32-wifi
+        run: pio run -e wt32-eth01 -e esp32-wifi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: box-firmware
+          path: |
+            firmware/.pio/build/wt32-eth01/firmware.bin
+            firmware/.pio/build/esp32-wifi/firmware.bin
+          if-no-files-found: error
+
+  hub:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.4.4"
+      - name: Mosquitto (for the end-to-end test)
+        run: sudo apt-get update && sudo apt-get install -y mosquitto
+      - name: Hub tests
+        working-directory: hub
+        run: |
+          bun install --frozen-lockfile
+          bun run typecheck
+          bun test
+      - name: Box simulator tests (vectors + end to end)
+        working-directory: tools/box-sim
+        run: |
+          bun install --frozen-lockfile
+          bunx tsc --noEmit -p .
+          bun test
