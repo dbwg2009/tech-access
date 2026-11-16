@@ -7,7 +7,10 @@ import type { FobReader } from "./reader/types";
 import type { Admin } from "./panel/admin";
 import type { Editor } from "./panel/editor";
 import type { Panel } from "./panel/panel";
+import type { Firmware } from "./firmware";
+import type { BoxLink } from "./mqtt/boxes";
 import { adminRoutes } from "./routes/admin";
+import { boxRoutes, firmwareFileRoutes } from "./routes/boxes";
 import { devRoutes } from "./routes/dev";
 import { panelRoutes } from "./routes/panel";
 import { importRoutes } from "./routes/import";
@@ -26,6 +29,10 @@ export interface AppDeps {
   editor?: Editor;
   /** Called after an import is applied, so box allowlists and the panel refresh. */
   onDataChanged?: () => void;
+  /** Box link (GET /api/boxes). */
+  boxes?: BoxLink;
+  /** Box firmware store (GET /fw/<file>). */
+  firmware?: Firmware;
 }
 
 const PUBLIC_DIR = resolve(import.meta.dir, "../public");
@@ -38,7 +45,7 @@ const TYPES: Record<string, string> = {
   ".woff2": "font/woff2",
 };
 
-export function createApp({ db, config, startedAt = Date.now(), now = () => new Date(), reader, panel, admin, editor, onDataChanged }: AppDeps) {
+export function createApp({ db, config, startedAt = Date.now(), now = () => new Date(), reader, panel, admin, editor, onDataChanged, boxes, firmware }: AppDeps) {
   const app = new Hono();
 
   app.get("/api/health", (c) => {
@@ -70,7 +77,9 @@ export function createApp({ db, config, startedAt = Date.now(), now = () => new 
   app.route("/api", devRoutes(reader));
   if (panel) app.route("/api", panelRoutes(panel, { fakeReader: config.fakeReader }));
   if (panel && admin && editor) app.route("/api", adminRoutes(panel, admin, editor));
+  if (boxes) app.route("/api", boxRoutes(db, boxes));
   app.all("/api/*", (c) => c.json({ error: "Not found" }, 404));
+  if (firmware) app.route("/", firmwareFileRoutes(firmware));
 
   // Local static files only. No CDN.
   app.get("/*", async (c) => {

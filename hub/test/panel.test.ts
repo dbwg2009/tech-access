@@ -260,8 +260,8 @@ describe("overview and health", () => {
     h.tap(UID.ada);
     const ov = (await h.req("GET", `/api/panel/overview?session=${h.sid()}`)).json;
     expect(ov.boxes).toEqual([
-      { box_id: "CASE-01", name: "LX case", status: "never_seen", statusText: "never seen", lastSeen: null },
-      { box_id: "BOX-01", name: "Mic box", status: "locked", statusText: "locked", lastSeen: T0.toISOString() },
+      { box_id: "CASE-01", name: "LX case", status: "never_seen", statusText: "never seen", lastSeen: null, door: null },
+      { box_id: "BOX-01", name: "Mic box", status: "locked", statusText: "locked", lastSeen: T0.toISOString(), door: null },
     ]);
     expect(ov.health).toEqual({ tempC: 48.5, diskFreeMB: 200000, diskTotalMB: 250000, mqtt: true, reader: { state: "ok", detail: "fake reader (development)" } });
     expect(ov.showMode).toBe(false);

@@ -14,13 +14,18 @@ export interface Bus {
 }
 
 /** Subscriptions the hub needs (see docs/mqtt.md). */
-export const HUB_SUBSCRIPTIONS = ["box/+/state", "box/+/heartbeat"];
+export const HUB_SUBSCRIPTIONS = ["box/+/state", "box/+/heartbeat", "box/+/tap"];
+
+/** Retained hub/status; the broker publishes the will if the hub drops off (decision 2026-11-16). */
+const HUB_STATUS = { topic: "hub/status", online: JSON.stringify({ online: true }), offline: JSON.stringify({ online: false }) };
 
 export interface MqttBusOptions {
   url: string;
   username: string;
   password?: string;
   log?: (msg: string) => void;
+  /** MQTT client ID. Default "tech-access-hub" (tests use their own). */
+  clientId?: string;
 }
 
 export class MqttJsBus implements Bus {
@@ -34,13 +39,16 @@ export class MqttJsBus implements Bus {
     this.client = mqtt.connect(o.url, {
       username: o.username,
       password: o.password,
-      clientId: "tech-access-hub",
+      clientId: o.clientId ?? "tech-access-hub",
       clean: true,
       reconnectPeriod: 5_000,
       connectTimeout: 5_000,
       keepalive: 30,
       queueQoSZero: false,
       resubscribe: true,
+      // If the hub crashes or the Pi loses power, boxes see hub/status go offline and start
+      // their offline timers (docs/mqtt.md).
+      will: { topic: HUB_STATUS.topic, payload: Buffer.from(HUB_STATUS.offline), qos: 1, retain: true },
     });
     this.client.on("connect", () => {
       this.lastError = "";
@@ -82,7 +90,19 @@ export class MqttJsBus implements Bus {
     this.connFns.push(fn);
   }
 
+  /** Clean shutdown: say offline (a clean disconnect doesn't trigger the will), then disconnect. */
   async close(): Promise<void> {
+    if (this.client.connected) {
+      await this.client.publishAsync(HUB_STATUS.topic, HUB_STATUS.offline, { qos: 1, retain: true }).catch(() => {});
+      await this.client.endAsync(false).catch(() => {});
+    } else {
+      await this.client.endAsync(true).catch(() => {});
+    }
+  }
+
+  /** Tests: drop the connection without a clean disconnect, as a crash would (the broker sends the will). */
+  async crash(): Promise<void> {
+    (this.client as unknown as { stream?: { destroy(): void } }).stream?.destroy();
     await this.client.endAsync(true).catch(() => {});
   }
 }

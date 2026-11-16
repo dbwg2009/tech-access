@@ -43,8 +43,10 @@ for (const sig of ["SIGINT", "SIGTERM"] as const) {
     hub.stop();
     server.stop();
     void reader.stop();
-    void bus.close();
-    db.close();
-    process.exit(0);
+    // Tell the boxes the hub is going (hub/status offline), but never wait long for it.
+    void Promise.race([bus.close(), Bun.sleep(1_500)]).finally(() => {
+      db.close();
+      process.exit(0);
+    });
   });
 }

@@ -75,6 +75,8 @@ usb_mount_root = "/media"
 timezone = "$TIMEZONE"
 reader_device = "$READER_DEVICE"
 fake_reader = false
+firmware_dir = "$DATA_DIR/firmware"
+firmware_url = "http://$STATIC_IP:$HUB_PORT"
 TOML
 
 say "systemd unit"

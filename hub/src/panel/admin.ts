@@ -21,6 +21,8 @@ import {
   setFlag,
 } from "../data";
 import { schemaVersion } from "../db";
+import type { Firmware } from "../firmware";
+import { TAP_REASON_WORDS } from "../mqtt/boxes";
 import { firstName } from "../names";
 import { insertRow, updateRow } from "../panelChanges";
 import { localDate } from "../time";
@@ -59,7 +61,7 @@ export class Admin {
 
   constructor(
     private readonly panel: Panel,
-    private readonly opts: { run?: Runner; backupDir?: string | null; onDataChanged?: () => void } = {},
+    private readonly opts: { run?: Runner; backupDir?: string | null; onDataChanged?: () => void; firmware?: Firmware } = {},
   ) {
     this.db = panel.db;
     panel.registerConfirmer("students_disabled", (s, p, uid) => this.doStudents(s, true, uid));
@@ -67,6 +69,7 @@ export class Admin {
     panel.registerConfirmer("force_return", (s, p, uid) => this.doForceReturn(s, p, uid));
     panel.registerConfirmer("restart", (s, p, uid) => this.doRestart(s, p, uid));
     panel.registerConfirmer("import_apply", (s, p, uid) => this.doImport(s, p, uid));
+    panel.registerConfirmer("firmware_update", (s, p, uid) => this.doFirmwareUpdate(s, p, uid));
     panel.setCaptureHandler((s, uid, c) => (c.purpose === "add_fob" ? this.onAddFob(s, c.personId!, uid) : this.onCaptured(s, c.purpose, uid)));
   }
 
@@ -331,14 +334,69 @@ export class Admin {
     return ok(`${kit.item} marked as returned`);
   }
 
+  // ---- box firmware (OTA) ----------------------------------------------------------------------
+
+  /** Stored images and what each box runs. */
+  firmware(): Record<string, unknown> {
+    const fw = this.opts.firmware;
+    return {
+      images: fw ? fw.list().map((f) => ({ version: f.version, size: f.size, sha256: f.sha256, uploadedAt: f.uploaded_at, source: f.source })) : [],
+      boxes: allBoxes(this.db).map((b) => ({
+        box_id: b.box_id,
+        name: b.name,
+        status: this.panel.boxes.status(b),
+        fw: b.fw,
+        ota: b.ota_status ? { status: b.ota_status, version: b.ota_version, why: b.ota_why, at: b.ota_at } : null,
+      })),
+    };
+  }
+
+  /** Store an image (no confirm tap: storing changes nothing on a box). */
+  uploadFirmware(s: Session, bytes: Uint8Array, version: unknown): Result {
+    const fw = this.opts.firmware;
+    if (!fw) return no("Firmware updates aren't set up on this hub", 503);
+    if (typeof version !== "string") return no("version is required", 400);
+    const r = fw.addImage(bytes, version.trim(), s.fobUid, "panel");
+    if (!r.ok) return no(r.reason, r.status);
+    return ok(`Firmware ${r.value.version} stored (${Math.round(r.value.size / 1024)} KB)`, { firmware: r.value });
+  }
+
+  /** Update one box or all: risky, so it waits for an admin fob tap (decision 2026-11-16). */
+  firmwareUpdate(s: Session, b: Record<string, unknown>): Result {
+    const fw = this.opts.firmware;
+    if (!fw) return no("Firmware updates aren't set up on this hub", 503);
+    const boxes = b.boxes === "all" ? "all" : Array.isArray(b.boxes) && b.boxes.every((x) => typeof x === "string") && b.boxes.length ? (b.boxes as string[]) : null;
+    if (!boxes) return no('boxes must be "all" or a list of Box IDs', 400);
+    const version = typeof b.version === "string" ? b.version : (fw.list()[0]?.version ?? null);
+    if (!version || !fw.get(version)) return no(version ? `No firmware ${version} stored` : "No firmware uploaded yet", 404);
+    const label = boxes === "all" ? `Update every box to ${version}` : `Update ${boxes.join(", ")} to ${version}`;
+    return this.panel.requestConfirm(s, "firmware_update", label, { boxes, version });
+  }
+
+  private doFirmwareUpdate(s: Session, p: Pending, confirmedBy: string): Result {
+    const fw = this.opts.firmware!;
+    const r = fw.requestUpdate({ version: p.params.version as string, boxes: p.params.boxes as string[] | "all", by: confirmedBy, via: "panel" });
+    this.action(s, "firmware_update", confirmedBy, r.ok ? { version: r.value.version, sent: r.value.sent, skipped: r.value.skipped } : { error: r.reason });
+    this.panel.overviewChanged();
+    if (!r.ok) return no(r.reason, r.status);
+    const { sent, skipped } = r.value;
+    const skippedText = skipped.length ? `. Skipped: ${skipped.map((x) => `${x.box_id} (${x.reason})`).join(", ")}` : "";
+    return ok(`Asked ${sent.length} box${sent.length === 1 ? "" : "es"} to update to ${r.value.version}${skippedText}`, r.value as unknown as Record<string, unknown>);
+  }
+
   // ---- end of session ----------------------------------------------------------------------------
 
   endOfSessionPreview(): Record<string, unknown> {
     return {
       kitOut: this.kitOutList(),
+      // A box is still open if its lock is open, or its reed switch says the door is open
+      // (decision 2026-11-16: the lock is powered anyway, but a propped door isn't locked).
       boxesOpen: allBoxes(this.db)
-        .filter((b) => this.panel.boxes.status(b) === "open")
-        .map((b) => ({ box_id: b.box_id, name: b.name })),
+        .filter((b) => {
+          const st = this.panel.boxes.status(b);
+          return st === "open" || (st === "locked" && b.door_state === "open");
+        })
+        .map((b) => ({ box_id: b.box_id, name: b.name, lock: b.lock_state, door: b.door_state })),
       showMode: getFlag(this.db, "show_mode"),
     };
   }
@@ -525,7 +583,7 @@ export class Admin {
       people: allPeople(this.db).map((p) => ({ id: p.person_id, name: firstName(p.name) })),
       boxes: allBoxes(this.db).map((b) => ({ id: b.box_id, name: b.name })),
       kit: this.db.query<{ id: string; name: string }, []>("SELECT kit_id AS id, item AS name FROM kit WHERE archived_at IS NULL ORDER BY item").all(),
-      types: ["sign_in", "sign_out", "kit_out", "kit_in", "kit_denied", "box_open", "box_denied", "tap_denied", "admin_action", "import_applied", "export"],
+      types: ["sign_in", "sign_out", "kit_out", "kit_in", "kit_denied", "box_open", "box_denied", "tap_denied", "admin_action", "import_applied", "export", "software_update"],
     };
   }
 }
@@ -545,6 +603,35 @@ const ACTION_WORDS: Record<string, (subject: string | null, kit: string | null, 
   backup: () => "made a backup",
   restart_hub: () => "restarted the hub",
   reboot_pi: () => "rebooted the Pi",
+  firmware_update: (_w, _k, d) => `asked boxes to update to ${String(d.version ?? "new firmware")}`,
+};
+
+/** software_update stages (box state `ota`, plus the hub's own). */
+const UPDATE_WORDS: Record<string, (box: string, v: string, why: string) => string> = {
+  uploaded: (_b, v) => `Box firmware ${v} uploaded`,
+  requested: (b, v) => `${b} asked to update to ${v}`,
+  skipped: (b, v, why) => `${b} not asked to update to ${v}${why}`,
+  updating: (b, v) => `${b} is updating to ${v}`,
+  refused: (b, v, why) => `${b} refused update ${v}${why}`,
+  failed: (b, v, why) => `${b} update to ${v} failed${why}`,
+  rebooting: (b, v) => `${b} installed ${v}, restarting`,
+  updated: (b, v) => `${b} is now running ${v}`,
+  rolled_back: (b, v, why) => `${b} went back to its old firmware: ${v} didn't work${why}`,
+};
+
+/** Box-side `ota_why` codes in plain words. */
+const OTA_WHY_WORDS: Record<string, string> = {
+  unlocked: "box was unlocked",
+  show_mode: "show mode is on",
+  mid_tap: "someone was using it",
+  expired: "the request was too old",
+  already_running: "already on that version",
+  bad_request: "the request was incomplete",
+  sha256_mismatch: "download was corrupted",
+  size_mismatch: "download was the wrong size",
+  download_incomplete: "download stopped part way",
+  no_space: "no room for the new firmware",
+  flash_failed: "couldn't write it",
 };
 
 /** One plain line per event for the log screen. */
@@ -570,9 +657,23 @@ export function describe(
     case "kit_denied":
       return `${w} couldn't ${d.action === "return" ? "return" : "take"} ${kit}${reason}`;
     case "box_open":
+      if (d.via === "box") {
+        // listed: the fob was on the box's saved list. Otherwise the box was already unlocked.
+        if (d.reason !== "listed" && typeof d.reason === "string") return `${w} tapped ${box} at the box (${TAP_REASON_WORDS[d.reason] ?? d.reason})`;
+        return `${w} opened ${box} at the box${d.source === "offline" ? " (hub was unreachable, the box used its saved list)" : ""}`;
+      }
       return `${box} opened for ${w}${d.via === "take" || d.via === "return" ? ` (${d.via} kit)` : ""}`;
     case "box_denied":
+      if (d.via === "box") {
+        const r = typeof d.reason === "string" ? `: ${TAP_REASON_WORDS[d.reason] ?? d.reason}` : "";
+        return `${w} couldn't open ${box} at the box${r}${d.source === "offline" ? " (hub was unreachable)" : ""}`;
+      }
       return `${w} couldn't open ${box}${reason}`;
+    case "software_update": {
+      const fn = UPDATE_WORDS[String(d.stage)];
+      const why = typeof d.why === "string" && d.why ? `: ${OTA_WHY_WORDS[d.why] ?? d.why}` : "";
+      return fn ? fn(box ?? "A box", String(d.version ?? "?"), why) : `Software update (${String(d.stage)})`;
+    }
     case "tap_denied":
       return `Panel refused ${w}${reason}`;
     case "admin_action": {

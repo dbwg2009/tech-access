@@ -27,3 +27,9 @@ reader_device = "/dev/ttyAMA0"
 # only) and the panel's dev key, which cycles through fake_fobs. Never true on the Pi.
 fake_reader = false
 fake_fobs = []
+
+# Box firmware (OTA, weeks 5-6). Images uploaded with POST /api/admin/firmware are kept here and
+# served read-only to the Control subnet at /fw/<file>. On the Pi: /var/lib/tech-access/firmware.
+firmware_dir = "data/firmware"
+# The address boxes download from: the Pi on the Control subnet.
+firmware_url = "http://10.102.40.10:8080"

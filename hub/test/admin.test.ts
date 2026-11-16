@@ -262,7 +262,7 @@ describe("end of session", () => {
     await h.req("POST", "/api/admin/show-mode", { session: s, on: true });
     h.tap(UID.ritterAdmin);
     const pre = (await h.req("GET", `/api/admin/end-of-session?session=${s}`)).json;
-    expect(pre).toEqual({ kitOut: [{ kit_id: "K004", item: "Gaffer tape", holder: "Ada", since: T0.toISOString() }], boxesOpen: [{ box_id: "BOX-01", name: "Mic box" }], showMode: true });
+    expect(pre).toEqual({ kitOut: [{ kit_id: "K004", item: "Gaffer tape", holder: "Ada", since: T0.toISOString() }], boxesOpen: [{ box_id: "BOX-01", name: "Mic box", lock: "open", door: null }], showMode: true });
     const r = (await h.req("POST", "/api/admin/end-of-session", { session: s })).json;
     expect(r.message).toBe("Locking 2 boxes. Show mode is off");
     expect(getFlag(h.db, "show_mode")).toBe(false);
@@ -299,7 +299,7 @@ describe("hub status, restart, reboot", () => {
   test("status has version, uptime, disk, temperature, MQTT, reader", async () => {
     const h = setup();
     const st = (await h.req("GET", `/api/admin/status?session=${admin(h)}`)).json;
-    expect(st).toMatchObject({ version: expect.any(String), schemaVersion: 2, tempC: 48.5, diskFreeMB: 200000, mqtt: true, reader: { state: "ok" } });
+    expect(st).toMatchObject({ version: expect.any(String), schemaVersion: 3, tempC: 48.5, diskFreeMB: 200000, mqtt: true, reader: { state: "ok" } });
     expect(typeof st.uptimeSeconds).toBe("number");
   });
 

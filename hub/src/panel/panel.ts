@@ -467,7 +467,7 @@ export class Panel {
       signedIn: signedIn(this.db).map((x) => ({ name: this.holderName(x.person_id), since: x.since })),
       boxes: allBoxes(this.db).map((b) => {
         const status = this.boxes.status(b);
-        return { box_id: b.box_id, name: b.name, status, statusText: BOX_STATUS_WORDS[status], lastSeen: b.last_seen };
+        return { box_id: b.box_id, name: b.name, status, statusText: BOX_STATUS_WORDS[status], lastSeen: b.last_seen, door: b.door_state };
       }),
       kitOut: kitOut(this.db).map((o) => ({ kit_id: o.kit_id, item: kit.get(o.kit_id)?.item ?? o.kit_id, holder: this.holderName(o.person_id), since: o.since })),
       showMode: settings.showMode === true,

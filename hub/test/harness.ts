@@ -20,7 +20,7 @@ export function setup(at = T0) {
   let now = at.getTime();
   const hub = buildHub({
     db,
-    config: { ...DEFAULTS, dbPath: ":memory:", fakeReader: true },
+    config: { ...DEFAULTS, dbPath: ":memory:", fakeReader: true, firmwareDir: mkdtempSync(join(tmpdir(), "ta-fw-")) },
     bus,
     reader,
     now: () => new Date(now),

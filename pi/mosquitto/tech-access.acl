@@ -7,3 +7,7 @@ topic readwrite #
 # Each box logs in with its Box ID as the username (e.g. BOX-01) and can only use
 # its own topics: box/BOX-01/... (heartbeat, taps, door state, commands, OTA).
 pattern readwrite box/%u/#
+
+# Every box may read the hub's presence (retained, with the hub's last will = offline), so a box
+# can tell "hub crashed" from "broker down" and start its offline timer (decision 2026-11-16).
+pattern read hub/status
