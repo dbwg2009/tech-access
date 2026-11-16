@@ -1,0 +1,47 @@
+{ "defaults":{"boot":{"clock":"2026-11-16T18:00:00.000Z","fobs":{"v":1,"ts":"2026-11-16T18:00:00.000Z","offline_unlock_min":5,"fobs":[{"uid":"04A1B2C3D4E5F6"},{"uid":"AABBCCDD","until":"2026-11-16"}]},"fw":"0.1.0","door_sensor":true}},
+  "cases": [
+    { "name": "open unlocks for its seconds and echoes ref",
+      "steps": [ {"at":0,"broker":true},{"at":0,"msg":"hub","payload":{"online":true}},
+        {"at":1000,"msg":"cmd","payload":{"cmd":"open","seconds":8,"ts":"2026-11-16T18:00:01.000Z","expires":"2026-11-16T18:00:16.000Z","ref":1234},
+         "expect":{"lock":"open","why":"cmd"},"publish":[{"topic":"state","match":{"lock":"open","why":"cmd","ref":1234,"fw":"0.1.0"}}]},
+        {"at":8999,"expect":{"lock":"open"}},
+        {"at":9000,"expect":{"lock":"locked"},"publish":[{"topic":"state","match":{"lock":"locked"},"absent":["ref"]}]}
+      ]},
+    { "name": "a command whose expires is in the past is ignored",
+      "steps": [ {"at":0,"broker":true},{"at":0,"msg":"hub","payload":{"online":true}},
+        {"at":1000,"msg":"cmd","payload":{"cmd":"open","seconds":8,"expires":"2026-11-16T18:00:00.500Z","ref":1},
+         "expect":{"lock":"locked"},"no_publish":["state"],"no_actions":["set_lock"]}
+      ]},
+    { "name": "a command with no expires is ignored when the clock is set",
+      "steps": [ {"at":0,"broker":true},{"at":0,"msg":"hub","payload":{"online":true}},
+        {"at":1000,"msg":"cmd","payload":{"cmd":"open","seconds":8,"ref":1},"expect":{"lock":"locked"},"no_publish":["state"]}
+      ]},
+    { "name": "clock never set: commands are accepted (expires can't be checked)",
+      "boot": {"clock":null},
+      "steps": [ {"at":0,"broker":true},{"at":0,"msg":"hub","payload":{"online":true}},
+        {"at":1000,"msg":"cmd","payload":{"cmd":"open","seconds":8,"expires":"2020-01-01T00:00:00.000Z","ref":7},
+         "expect":{"lock":"open","why":"cmd"},"publish":[{"topic":"state","match":{"ref":7,"ts":null}}]}
+      ]},
+    { "name": "lock locks now and says why",
+      "steps": [ {"at":0,"broker":true},{"at":0,"msg":"hub","payload":{"online":true}},
+        {"at":1000,"tap":"04A1B2C3D4E5F6","expect":{"lock":"open"}},
+        {"at":2000,"msg":"cmd","payload":{"cmd":"lock","expires":"2026-11-16T18:00:17.000Z","ref":1240},
+         "expect":{"lock":"locked","why":"cmd"},"publish":[{"topic":"state","match":{"lock":"locked","why":"cmd","ref":1240}}]}
+      ]},
+    { "name": "lock on a locked box still answers with ref",
+      "steps": [ {"at":0,"broker":true},{"at":0,"msg":"hub","payload":{"online":true}},
+        {"at":1000,"msg":"cmd","payload":{"cmd":"lock","expires":"2026-11-16T18:00:16.000Z","ref":5},
+         "expect":{"lock":"locked"},"no_actions":["set_lock"],"publish":[{"topic":"state","match":{"lock":"locked","ref":5}}]}
+      ]},
+    { "name": "open is capped at 30 seconds",
+      "steps": [ {"at":0,"broker":true},{"at":0,"msg":"hub","payload":{"online":true}},
+        {"at":1000,"msg":"cmd","payload":{"cmd":"open","seconds":600,"expires":"2026-11-16T18:00:16.000Z","ref":null}},
+        {"at":30999,"expect":{"lock":"open"}},
+        {"at":31000,"expect":{"lock":"locked"}}
+      ]},
+    { "name": "an unknown command is ignored",
+      "steps": [ {"at":0,"broker":true},{"at":0,"msg":"hub","payload":{"online":true}},
+        {"at":1000,"msg":"cmd","payload":{"cmd":"explode","expires":"2026-11-16T18:00:16.000Z"},"expect":{"lock":"locked"},"no_publish":["state"]}
+      ]}
+  ]
+}

@@ -81,6 +81,16 @@ export interface BoxRow extends Box {
   last_seen: string | null;
   lock_state: "locked" | "open" | null;
   lock_state_at: string | null;
+  /** Firmware version from the last heartbeat or state. */
+  fw: string | null;
+  /** Reed switch: null = never reported (or no switch fitted). */
+  door_state: "open" | "shut" | null;
+  door_state_at: string | null;
+  /** Latest firmware update status (see docs/mqtt.md, `ota` in state). */
+  ota_status: string | null;
+  ota_version: string | null;
+  ota_why: string | null;
+  ota_at: string | null;
 }
 
 export function getBox(db: Database, id: string): BoxRow | null {

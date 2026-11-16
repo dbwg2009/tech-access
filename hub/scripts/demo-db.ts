@@ -31,6 +31,7 @@ for (const r of people) p.run(...r);
 
 const b = db.query("INSERT INTO boxes (box_id, name, type, required_level, network, ip_address, location) VALUES (?, ?, ?, ?, ?, ?, ?)");
 b.run("BOX-01", "Mic box", "Fixed (PoE)", 2, "Ethernet", "10.102.40.101", "Control room");
+b.run("BOX-02", "Cable box", "Fixed (PoE)", 1, "Ethernet", "10.102.40.103", "Control room");
 b.run("KEYS-01", "Key cabinet", "Key cabinet", 3, "Ethernet", "10.102.40.102", "Control room");
 b.run("CASE-01", "LX case", "Flight case (Wi-Fi)", null, "Wi-Fi", null, "Store");
 

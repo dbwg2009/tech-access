@@ -1,7 +1,7 @@
 # Tech kit access control: handoff brief
 
 Planning board: https://claude.ai/artifact/Aq3nca2xkPFz1mNHRofgML
-Status (16 Nov 2026): weeks 1–2 merged; weeks 3–4 (desk panel, fob reader, admin menu) in progress.
+Status (16 Nov 2026): weeks 1–4 merged; weeks 5–6 (first lock box firmware, box simulator, OTA) built and tested without hardware; bench test waiting for parts. The desk panel is moving to a native app (separate work).
 
 ## What it is
 A fob-based access control system for the school tech kit (lighting/sound kit, radio mics, Nomad key, keys, show network). It does **not** control the control room door, because that would need site to approve it, install it and issue cards. It's for the Year 7–9 tech crew (Level 1–4 ladder), drama staff, Mrs Pearce/Mrs Ritter and hire company techs. It has to run with as little maintenance as possible after Daniel leaves in 2028.
@@ -39,7 +39,7 @@ A fob-based access control system for the school tech kit (lighting/sound kit, r
 ## Build order (about 15 h a week)
 1. **Wk 1–2:** Pi base (NVMe boot, static IP, RTC, Mosquitto, Bun, local CA, repo), database schema (people, fobs, levels, kit, boxes, events), Tracker .xlsx importer with preview, fob roles.
 2. **Wk 3–4:** Desk panel + Pi fob reader; admin menu.
-3. **Wk 5–6:** First lock box end to end + OTA.
+3. **Wk 5–6:** First lock box end to end + OTA. (Firmware, simulator and OTA done; bench test when the parts arrive: `docs/wiki/Bench-Test.md`.)
 4. **Wk 7:** Management USBs.
 5. **Wk 8–10:** Stage Door port + door station (biggest unknown).
 6. **Wk 11+:** Nomad agent, kit NFC tags, more boxes, key cabinet.

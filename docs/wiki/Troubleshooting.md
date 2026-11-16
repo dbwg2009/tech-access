@@ -80,7 +80,7 @@ Day passes use the clock. A wrong date means passes show "expired" or "isn't val
 | Fob gives "Ask a staff member" | The reason is on screen. **Admin → Event log** shows the same (*Fob refused*). |
 | Screen never turns off | Something keeps touching it, or a card was left open (they close after 30 s / 90 s). `journalctl -t tech-access-kiosk -b \| grep -i swayidle` |
 | Restart / reboot from the admin menu does nothing | `journalctl -u tech-access-hub -n 20` shows `systemctl ... failed`. Re-run `sudo ./06-kiosk.sh` (installs the polkit rule). Check `ls /etc/polkit-1/rules.d/`. |
-| Box shows "offline" / "never seen" | Expected until the boxes exist (week 5). Afterwards: the box isn't sending heartbeats; see [MQTT](#mqtt). |
+| Box shows "offline" / "never seen" | The box isn't sending heartbeats. See [Lock boxes](#lock-boxes) below. |
 
 ## MQTT
 
@@ -88,6 +88,29 @@ Day passes use the clock. A wrong date means passes show "expired" or "isn't val
 - A box gets `not authorised`: its username must be exactly its Box ID, and it can only use
   `box/<Box ID>/...`. Re-run `sudo ./mqtt-add-box.sh <Box ID>` to see its password.
 - Broker won't start after a config change: `journalctl -u mosquitto -n 30`, then re-run `sudo ./03-mosquitto.sh`.
+
+## Lock boxes
+
+**A box that won't open in a hurry:** pull its PoE cable. No power = maglock off = open. Fix it
+afterwards. Plug a laptop into the box's serial pins (IO1/IO3, 3.3 V adapter) and run
+`pio device monitor -p <port>`; type `status` for everything the box knows.
+
+| You see | Means / do |
+| --- | --- |
+| Panel: box **never seen** | It has never sent a heartbeat. Serial `status`: is it provisioned (`show`)? `net eth down` = cable, splitter or IP. `mqtt down` = see the next rows. |
+| Serial: `mqtt: connect failed (error -…, code 4/5)` | Wrong password or Box ID. Re-run `provision.py` with the password from `sudo ./mqtt-add-box.sh <Box ID>`. The Box ID must match the panel exactly (`BOX-01`, not `box-01`). |
+| Serial: `mqtt: connect failed (error -3…)`, net up | Can't reach `10.102.40.10:1883`. Wrong `hub` or `ip`/`mask` (`show`), or Mosquitto is down on the Pi (`systemctl status mosquitto`). |
+| Panel: box **offline** | No heartbeat for 90 s. Power, cable, PoE port, or the box is rebooting over and over (serial shows the reason, e.g. a watchdog). |
+| Box open, panel says open, nobody tapped (`why: offline`) | The box can't see the hub: Pi down, hub stopped, or the network. It locks again by itself when the hub is back. `journalctl -u tech-access-hub -n 50`. |
+| Box open with `why: no_list` | It has never had a fob list. The hub sends it when it connects; check the box is in the box list with exactly this Box ID. |
+| Allowed fob doesn't open the box | Event log: "couldn't open … at the box: …" gives the reason. `not allowed on this box` = level / status; check the person. `the box's clock isn't set yet` = a day pass and NTP isn't reaching the box (`status` shows `clock not set`; check chrony on the Pi, `sudo ./01-base.sh`). No event at all = the reader: serial `status` shows `reader not answering` (wiring, DIP switches `0 0` for HSU, 3.3 V). |
+| Box locks but the door was open | Expected: the maglock catches the door when it's pushed shut. The panel and End of session show the door open. |
+| Door always shows open | Reed switch wire broken or magnet too far away (more than ~15 mm). Serial `status` shows `door open/shut` live. |
+| Update says `refused (unlocked)` / `(show_mode)` / `(mid_tap)` | Working as intended: a box only updates while locked and idle. Try again when it's locked. |
+| Update says `failed (sha256_mismatch)` / `(size_mismatch)` / `(http_404)` | The download was damaged or the file's gone. Upload the image again (`update-boxes.ts`). The box carries on with its old firmware. |
+| Update says `rolled_back` | The new firmware didn't reach the hub within 5 minutes (or crashed), so the box went back to the old one. Look at the serial output of the new version on a bench box before trying again. |
+| Box keeps rebooting after you changed the wiring | Something on IO0, IO2, IO12 or IO15 at boot (strapping pins). Only use the pins on the [Lock boxes](Lock-Boxes.md#pins-wt32-eth01) page. |
+| Can't flash: `Failed to connect to ESP32` | IO0 must be jumpered to GND **while** you press reset; adapter at 3.3 V; TX→IO3, RX→IO1 (crossed). |
 
 ## Import problems
 

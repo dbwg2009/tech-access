@@ -1,0 +1,39 @@
+{ "defaults":{"boot":{"clock":"2026-11-16T18:00:00.000Z","fobs":{"v":1,"ts":"2026-11-16T18:00:00.000Z","offline_unlock_min":5,"fobs":[{"uid":"04A1B2C3D4E5F6"},{"uid":"AABBCCDD","until":"2026-11-16"}]},"fw":"0.1.0","door_sensor":true}},
+  "cases": [
+    { "name": "day pass works on its date",
+      "steps": [ {"at":0,"broker":true},{"at":0,"msg":"hub","payload":{"online":true}},
+        {"at":1000,"tap":"AABBCCDD","expect":{"lock":"open","why":"fob"},"publish":[{"topic":"tap","match":{"result":"allow","reason":"listed"}}]}
+      ]},
+    { "name": "day pass stops working after its local date",
+      "boot": {"clock":"2026-11-16T23:59:59.000Z"},
+      "steps": [ {"at":0,"broker":true},{"at":0,"msg":"hub","payload":{"online":true}},
+        {"at":500,"tap":"AABBCCDD","expect":{"lock":"open"}},
+        {"at":9000,"expect":{"lock":"locked"}},
+        {"at":10000,"tap":"AABBCCDD","expect":{"lock":"locked"},"publish":[{"topic":"tap","match":{"result":"deny","reason":"day_pass_expired"}}]}
+      ]},
+    { "name": "day pass uses Europe/London: 23:30 UTC on 15 July is already 16 July (BST)",
+      "boot": {"clock":"2026-07-15T23:30:00.000Z",
+               "fobs":{"v":1,"offline_unlock_min":5,"fobs":[{"uid":"AABBCCDD","until":"2026-07-15"},{"uid":"11223344","until":"2026-07-16"}]}},
+      "steps": [ {"at":0,"broker":true},{"at":0,"msg":"hub","payload":{"online":true}},
+        {"at":1000,"tap":"AABBCCDD","expect":{"lock":"locked"},"publish":[{"topic":"tap","match":{"result":"deny","reason":"day_pass_expired"}}]},
+        {"at":2000,"tap":"11223344","expect":{"lock":"open"},"publish":[{"topic":"tap","match":{"result":"allow"}}]}
+      ]},
+    { "name": "day pass uses GMT in winter: 23:30 UTC on 16 November is still 16 November",
+      "boot": {"clock":"2026-11-16T23:30:00.000Z"},
+      "steps": [ {"at":0,"broker":true},{"at":0,"msg":"hub","payload":{"online":true}},
+        {"at":1000,"tap":"AABBCCDD","expect":{"lock":"open"}}
+      ]},
+    { "name": "clock never set: day passes refused, standard fobs still work, ts null",
+      "boot": {"clock":null},
+      "steps": [ {"at":0,"broker":true},{"at":0,"msg":"hub","payload":{"online":true}},
+        {"at":1000,"tap":"AABBCCDD","expect":{"lock":"locked"},"publish":[{"topic":"tap","match":{"result":"deny","reason":"no_clock","ts":null}}]},
+        {"at":2000,"tap":"04A1B2C3D4E5F6","expect":{"lock":"open"},"publish":[{"topic":"tap","match":{"result":"allow","reason":"listed","ts":null}}]}
+      ]},
+    { "name": "once NTP sets the clock, day passes work",
+      "boot": {"clock":null},
+      "steps": [ {"at":0,"broker":true},{"at":0,"msg":"hub","payload":{"online":true}},
+        {"at":1000,"ntp":"2026-11-16T18:00:01.000Z"},
+        {"at":2000,"tap":"AABBCCDD","expect":{"lock":"open"},"publish":[{"topic":"tap","match":{"result":"allow","ts":"2026-11-16T18:00:02.000Z"}}]}
+      ]}
+  ]
+}

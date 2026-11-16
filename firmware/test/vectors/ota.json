@@ -1,0 +1,53 @@
+{ "defaults":{"boot":{"clock":"2026-11-16T18:00:00.000Z","fobs":{"v":1,"ts":"2026-11-16T18:00:00.000Z","offline_unlock_min":5,"fobs":[{"uid":"04A1B2C3D4E5F6"},{"uid":"AABBCCDD","until":"2026-11-16"}]},"fw":"0.1.0","door_sensor":true}},
+  "cases": [
+    { "name": "an update is started when the box is locked and idle",
+      "steps": [ {"at":0,"broker":true},{"at":0,"msg":"hub","payload":{"online":true}},
+        {"at":10000,"msg":"ota","payload":{"version":"0.2.0","url":"http://10.102.40.10:8080/fw/box-0.2.0.bin","sha256":"9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08","size":912345,"expires":"2026-11-16T18:05:00.000Z"},"actions":["start_ota"],
+         "publish":[{"topic":"state","match":{"lock":"locked","ota":"updating","ota_version":"0.2.0"}}]}
+      ]},
+    { "name": "refused while unlocked",
+      "steps": [ {"at":0,"broker":true},{"at":0,"msg":"hub","payload":{"online":true}},
+        {"at":1000,"msg":"cmd","payload":{"cmd":"open","seconds":8,"expires":"2026-11-16T18:00:16.000Z","ref":1}},
+        {"at":5000,"msg":"ota","payload":{"version":"0.2.0","url":"http://10.102.40.10:8080/fw/box-0.2.0.bin","sha256":"9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08","size":912345,"expires":"2026-11-16T18:05:00.000Z"},"no_actions":["start_ota"],
+         "publish":[{"topic":"state","match":{"ota":"refused","ota_why":"unlocked","ota_version":"0.2.0"}}]}
+      ]},
+    { "name": "refused in show mode",
+      "steps": [ {"at":0,"broker":true},{"at":0,"msg":"hub","payload":{"online":true}},
+        {"at":1000,"msg":"mode","payload":{"show":true}},
+        {"at":5000,"msg":"ota","payload":{"version":"0.2.0","url":"http://10.102.40.10:8080/fw/box-0.2.0.bin","sha256":"9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08","size":912345,"expires":"2026-11-16T18:05:00.000Z"},"no_actions":["start_ota"],"publish":[{"topic":"state","match":{"ota":"refused","ota_why":"show_mode"}}]}
+      ]},
+    { "name": "refused mid-tap (within 3 s of any tap), accepted after",
+      "steps": [ {"at":0,"broker":true},{"at":0,"msg":"hub","payload":{"online":true}},
+        {"at":10000,"tap":"11223344"},
+        {"at":12999,"msg":"ota","payload":{"version":"0.2.0","url":"http://10.102.40.10:8080/fw/box-0.2.0.bin","sha256":"9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08","size":912345,"expires":"2026-11-16T18:05:00.000Z"},"no_actions":["start_ota"],"publish":[{"topic":"state","match":{"ota":"refused","ota_why":"mid_tap"}}]},
+        {"at":13000,"msg":"ota","payload":{"version":"0.2.0","url":"http://10.102.40.10:8080/fw/box-0.2.0.bin","sha256":"9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08","size":912345,"expires":"2026-11-16T18:05:00.000Z"},"actions":["start_ota"]}
+      ]},
+    { "name": "refused when expired",
+      "boot": {"clock":"2026-11-16T18:10:00.000Z"},
+      "steps": [ {"at":0,"broker":true},{"at":0,"msg":"hub","payload":{"online":true}},
+        {"at":1000,"msg":"ota","payload":{"version":"0.2.0","url":"http://10.102.40.10:8080/fw/box-0.2.0.bin","sha256":"9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08","size":912345,"expires":"2026-11-16T18:05:00.000Z"},"no_actions":["start_ota"],"publish":[{"topic":"state","match":{"ota":"refused","ota_why":"expired"}}]}
+      ]},
+    { "name": "refused when it's the version already running",
+      "boot": {"fw":"0.2.0"},
+      "steps": [ {"at":0,"broker":true},{"at":0,"msg":"hub","payload":{"online":true}},
+        {"at":10000,"msg":"ota","payload":{"version":"0.2.0","url":"http://10.102.40.10:8080/fw/box-0.2.0.bin","sha256":"9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08","size":912345,"expires":"2026-11-16T18:05:00.000Z"},"no_actions":["start_ota"],"publish":[{"topic":"state","match":{"ota":"refused","ota_why":"already_running"}}]}
+      ]},
+    { "name": "refused when the request is incomplete",
+      "steps": [ {"at":0,"broker":true},{"at":0,"msg":"hub","payload":{"online":true}},
+        {"at":10000,"msg":"ota","payload":{"version":"0.2.0","url":"http://10.102.40.10:8080/fw/x.bin","size":10},"no_actions":["start_ota"],
+         "publish":[{"topic":"state","match":{"ota":"refused","ota_why":"bad_request"}}]}
+      ]},
+    { "name": "a failed download or check is reported, and the box carries on",
+      "steps": [ {"at":0,"broker":true},{"at":0,"msg":"hub","payload":{"online":true}},
+        {"at":10000,"msg":"ota","payload":{"version":"0.2.0","url":"http://10.102.40.10:8080/fw/box-0.2.0.bin","sha256":"9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08","size":912345,"expires":"2026-11-16T18:05:00.000Z"},"actions":["start_ota"]},
+        {"at":11000,"msg":"ota","payload":{"version":"0.2.0","url":"http://10.102.40.10:8080/fw/box-0.2.0.bin","sha256":"9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08","size":912345,"expires":"2026-11-16T18:05:00.000Z"},"no_actions":["start_ota"],"no_publish":["state"]},
+        {"at":20000,"ota_result":{"ok":false,"why":"sha256_mismatch"},"publish":[{"topic":"state","match":{"ota":"failed","ota_why":"sha256_mismatch","ota_version":"0.2.0"}}]},
+        {"at":21000,"tap":"04A1B2C3D4E5F6","expect":{"lock":"open"},"publish":[{"topic":"state","match":{"lock":"open"},"absent":["ota"]}]}
+      ]},
+    { "name": "taps still work while an update downloads",
+      "steps": [ {"at":0,"broker":true},{"at":0,"msg":"hub","payload":{"online":true}},
+        {"at":10000,"msg":"ota","payload":{"version":"0.2.0","url":"http://10.102.40.10:8080/fw/box-0.2.0.bin","sha256":"9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08","size":912345,"expires":"2026-11-16T18:05:00.000Z"},"actions":["start_ota"]},
+        {"at":12000,"tap":"04A1B2C3D4E5F6","expect":{"lock":"open"},"publish":[{"topic":"state","match":{"lock":"open","ota":"updating"}}]}
+      ]}
+  ]
+}

@@ -1,0 +1,20 @@
+{ "defaults":{"boot":{"clock":"2026-11-16T18:00:00.000Z","fobs":{"v":1,"ts":"2026-11-16T18:00:00.000Z","offline_unlock_min":5,"fobs":[{"uid":"04A1B2C3D4E5F6"},{"uid":"AABBCCDD","until":"2026-11-16"}]},"fw":"0.1.0","door_sensor":true}},
+  "cases": [
+    { "name": "door changes are reported in state",
+      "steps": [ {"at":0,"broker":true},{"at":0,"msg":"hub","payload":{"online":true}},
+        {"at":0,"door":"shut","publish":[{"topic":"state","match":{"lock":"locked","door":"shut"}}]},
+        {"at":1000,"door":"open","publish":[{"topic":"state","match":{"lock":"locked","door":"open"}}]}
+      ]},
+    { "name": "door left open when the box locks: the lock is powered anyway and the door reported open",
+      "steps": [ {"at":0,"broker":true},{"at":0,"msg":"hub","payload":{"online":true}}, {"at":0,"door":"shut"},
+        {"at":1000,"tap":"04A1B2C3D4E5F6"},
+        {"at":2000,"door":"open"},
+        {"at":9000,"expect":{"lock":"locked"},"actions":["set_lock"],"publish":[{"topic":"state","match":{"lock":"locked","door":"open"}}]}
+      ]},
+    { "name": "no reed switch fitted: no door field",
+      "boot": {"door_sensor":false},
+      "steps": [ {"at":0,"broker":true},{"at":0,"msg":"hub","payload":{"online":true}},
+        {"at":1000,"tap":"04A1B2C3D4E5F6","publish":[{"topic":"state","match":{"lock":"open"},"absent":["door"]}]}
+      ]}
+  ]
+}

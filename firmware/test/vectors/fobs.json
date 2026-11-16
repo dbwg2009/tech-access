@@ -1,0 +1,48 @@
+{ "defaults":{"boot":{"clock":"2026-11-16T18:00:00.000Z","fobs":{"v":1,"ts":"2026-11-16T18:00:00.000Z","offline_unlock_min":5,"fobs":[{"uid":"04A1B2C3D4E5F6"},{"uid":"AABBCCDD","until":"2026-11-16"}]},"fw":"0.1.0","door_sensor":true}},
+  "cases": [
+    { "name": "an unknown fobs v keeps the old list",
+      "steps": [ {"at":0,"broker":true},{"at":0,"msg":"hub","payload":{"online":true}},
+        {"at":1000,"msg":"fobs","payload":{"v":2,"fobs":[]},"no_actions":["store_fobs"]},
+        {"at":2000,"tap":"04A1B2C3D4E5F6","expect":{"lock":"open"}}
+      ]},
+    { "name": "no list at boot: unlocked (why no_list) until the first list arrives, which is stored",
+      "boot": {"fobs":null},
+      "steps": [
+        {"at":0,"expect":{"lock":"open","why":"no_list"}},
+        {"at":0,"broker":true,"publish":[{"topic":"state","match":{"lock":"open","why":"no_list"}}]},
+        {"at":0,"msg":"hub","payload":{"online":true}},
+        {"at":1000,"tap":"11223344","publish":[{"topic":"tap","match":{"result":"allow","reason":"no_list"}}]},
+        {"at":2000,"msg":"fobs","payload":{"v":1,"offline_unlock_min":5,"fobs":[{"uid":"04A1B2C3D4E5F6"}]},
+         "expect":{"lock":"locked"},"actions":["store_fobs","set_lock"]},
+        {"at":3000,"tap":"11223344","expect":{"lock":"locked"},"publish":[{"topic":"tap","match":{"result":"deny","reason":"not_listed"}}]}
+      ]},
+    { "name": "a stored list that can't be read counts as no list",
+      "boot": {"fobs":"{garbage"},
+      "steps": [ {"at":0,"expect":{"lock":"open","why":"no_list"}} ]},
+    { "name": "a new list replaces the old one",
+      "steps": [ {"at":0,"broker":true},{"at":0,"msg":"hub","payload":{"online":true}},
+        {"at":1000,"msg":"fobs","payload":{"v":1,"offline_unlock_min":5,"fobs":[{"uid":"11223344"}]},"actions":["store_fobs"]},
+        {"at":2000,"tap":"04A1B2C3D4E5F6","expect":{"lock":"locked"}},
+        {"at":3000,"tap":"11223344","expect":{"lock":"open"}}
+      ]},
+    { "name": "an empty list is a real list: locked, everyone denied",
+      "boot": {"fobs":null},
+      "steps": [
+        {"at":0,"broker":true},
+        {"at":0,"msg":"hub","payload":{"online":true}},
+        {"at":1000,"msg":"fobs","payload":{"v":1,"offline_unlock_min":5,"fobs":[]},"expect":{"lock":"locked"}},
+        {"at":2000,"tap":"04A1B2C3D4E5F6","expect":{"lock":"locked"},"publish":[{"topic":"tap","match":{"result":"deny"}}]}
+      ]},
+    { "name": "malformed fobs JSON is ignored",
+      "steps": [ {"at":0,"broker":true},{"at":0,"msg":"hub","payload":{"online":true}},
+        {"at":1000,"msg":"fobs","payload":"{\"v\":1,","no_actions":["store_fobs"]},
+        {"at":2000,"tap":"04A1B2C3D4E5F6","expect":{"lock":"open"}}
+      ]},
+    { "name": "entries with a bad uid or until are left out (denied), the rest are kept",
+      "steps": [ {"at":0,"broker":true},{"at":0,"msg":"hub","payload":{"online":true}},
+        {"at":1000,"msg":"fobs","payload":{"v":1,"offline_unlock_min":5,"fobs":[{"uid":"zz"},{"uid":"11223344","until":"16/11/2026"},{"uid":"55667788"}]}},
+        {"at":2000,"tap":"11223344","expect":{"lock":"locked"}},
+        {"at":3000,"tap":"55667788","expect":{"lock":"open"}}
+      ]}
+  ]
+}

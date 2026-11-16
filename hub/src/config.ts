@@ -16,6 +16,10 @@ export interface Config {
   readerDevice: string;
   /** UIDs the panel's dev key cycles through (fake reader only). */
   fakeFobs: string[];
+  /** Box firmware images (GET /fw/<file>). On the Pi: /var/lib/tech-access/firmware. */
+  firmwareDir: string;
+  /** Base URL boxes download firmware from: the Pi's Control-subnet address. */
+  firmwareUrl: string;
 }
 
 export const DEFAULTS: Config = {
@@ -29,6 +33,8 @@ export const DEFAULTS: Config = {
   fakeReader: false,
   readerDevice: "/dev/ttyAMA0",
   fakeFobs: [],
+  firmwareDir: "data/firmware",
+  firmwareUrl: "http://10.102.40.10:8080",
 };
 
 function str(v: unknown, key: string, fallback: string): string {
@@ -61,6 +67,9 @@ export function parseConfig(text: string, baseDir: string): Config {
     throw new Error("config: http_port must be an integer 1-65535");
   }
   const dbPath = str(raw.db_path, "db_path", DEFAULTS.dbPath);
+  const firmwareDir = str(raw.firmware_dir, "firmware_dir", DEFAULTS.firmwareDir);
+  const firmwareUrl = str(raw.firmware_url, "firmware_url", DEFAULTS.firmwareUrl);
+  if (!/^http:\/\/[^/]+(:\d+)?\/?$/.test(firmwareUrl)) throw new Error("config: firmware_url must look like http://10.102.40.10:8080");
   const timezone = str(raw.timezone, "timezone", DEFAULTS.timezone);
   try {
     new Intl.DateTimeFormat("en-GB", { timeZone: timezone });
@@ -78,6 +87,8 @@ export function parseConfig(text: string, baseDir: string): Config {
     fakeReader: bool(raw.fake_reader, "fake_reader", DEFAULTS.fakeReader),
     readerDevice: str(raw.reader_device, "reader_device", DEFAULTS.readerDevice),
     fakeFobs: uidList(raw.fake_fobs, "fake_fobs"),
+    firmwareDir: isAbsolute(firmwareDir) ? firmwareDir : resolve(baseDir, firmwareDir),
+    firmwareUrl,
   };
 }
 

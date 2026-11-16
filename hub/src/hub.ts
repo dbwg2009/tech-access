@@ -5,6 +5,7 @@ import { createApp } from "./app";
 import type { Config } from "./config";
 import type { Bus } from "./mqtt/bus";
 import { BoxLink } from "./mqtt/boxes";
+import { Firmware } from "./firmware";
 import { Admin, type Runner } from "./panel/admin";
 import { Editor } from "./panel/editor";
 import { Panel, type PanelTimings } from "./panel/panel";
@@ -32,6 +33,7 @@ export function buildHub(d: HubDeps) {
   const startedAt = d.startedAt ?? Date.now();
   const stream = new PanelStream();
   const boxes = new BoxLink(d.db, d.bus, now, d.config.timezone);
+  const firmware = new Firmware(d.db, d.config.firmwareDir, boxes, d.config.firmwareUrl, now);
   const panel = new Panel({
     db: d.db,
     config: d.config,
@@ -52,9 +54,9 @@ export function buildHub(d: HubDeps) {
     panel.overviewChanged();
   };
 
-  const admin = new Admin(panel, { run: d.run, backupDir: d.backupDir, onDataChanged: () => boxes.publishRetained() });
+  const admin = new Admin(panel, { run: d.run, backupDir: d.backupDir, onDataChanged: () => boxes.publishRetained(), firmware });
   const editor = new Editor(panel, () => boxes.publishRetained());
-  const app = createApp({ db: d.db, config: d.config, now, startedAt, reader: d.reader, panel, admin, editor, onDataChanged: dataChanged });
+  const app = createApp({ db: d.db, config: d.config, now, startedAt, reader: d.reader, panel, admin, editor, onDataChanged: dataChanged, boxes, firmware });
 
   let timers: ReturnType<typeof setInterval>[] = [];
   return {
@@ -63,6 +65,7 @@ export function buildHub(d: HubDeps) {
     admin,
     editor,
     boxes,
+    firmware,
     stream,
     dataChanged,
     /** Start the timers: panel tick every second, allowlist check every 5 minutes. */

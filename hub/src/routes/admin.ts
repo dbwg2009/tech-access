@@ -56,6 +56,17 @@ export function adminRoutes(panel: Panel, admin: Admin, editor: Editor) {
   post("end-of-session", (s) => admin.endOfSession(s));
   post("backup", (s) => admin.backup(s));
   post("restart", (s, b) => admin.restart(s, b.what));
+  // Box firmware (OTA). Upload is multipart: session, version, file (the build's firmware.bin).
+  get("firmware", () => admin.firmware());
+  r.post("/admin/firmware", async (c) => {
+    const form = await c.req.parseBody().catch(() => null);
+    const s = session(form?.session);
+    if ("ok" in s) return send(c, s);
+    const file = form?.file;
+    if (!(file instanceof File)) return send(c, { ok: false, reason: "file is required (multipart form field 'file')", status: 400 });
+    return send(c, admin.uploadFirmware(s, new Uint8Array(await file.arrayBuffer()), form?.version));
+  });
+  post("firmware/update", (s, b) => admin.firmwareUpdate(s, b));
   post("import-apply", (s, b) => {
     const res = parseResolutions(b.resolutions);
     if (!res) return { ok: false, reason: 'resolutions must be {"<key>": "panel" | "sheet"}', status: 400 };

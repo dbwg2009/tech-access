@@ -1,0 +1,43 @@
+{ "defaults":{"boot":{"clock":"2026-11-16T18:00:00.000Z","fobs":{"v":1,"ts":"2026-11-16T18:00:00.000Z","offline_unlock_min":5,"fobs":[{"uid":"04A1B2C3D4E5F6"},{"uid":"AABBCCDD","until":"2026-11-16"}]},"fw":"0.1.0","door_sensor":true}},
+  "cases": [
+    { "name": "allowed fob at the box unlocks for 8 s, then locks (hub online)",
+      "steps": [ {"at":0,"broker":true},{"at":0,"msg":"hub","payload":{"online":true}},
+        {"at":1000,"tap":"04a1b2c3d4e5f6","expect":{"lock":"open","why":"fob"},"actions":["set_lock"],
+         "publish":[{"topic":"tap","match":{"uid":"04A1B2C3D4E5F6","result":"allow","reason":"listed","source":"cached","ts":"2026-11-16T18:00:01.000Z","fw":"0.1.0"}},
+                    {"topic":"state","match":{"lock":"open","why":"fob"}}]},
+        {"at":8999,"expect":{"lock":"open"}},
+        {"at":9000,"expect":{"lock":"locked","why":""},"publish":[{"topic":"state","match":{"lock":"locked"},"absent":["why"]}]}
+      ]},
+    { "name": "unknown fob is denied and the box stays locked",
+      "steps": [ {"at":0,"broker":true},{"at":0,"msg":"hub","payload":{"online":true}},
+        {"at":1000,"tap":"11223344","expect":{"lock":"locked"},"no_actions":["set_lock"],
+         "publish":[{"topic":"tap","match":{"uid":"11223344","result":"deny","reason":"not_listed","source":"cached"}}],
+         "no_publish":["state"]}
+      ]},
+    { "name": "tap with no broker is checked against the cache at once and reported once the hub is back, as offline",
+      "steps": [
+        {"at":1000,"tap":"04A1B2C3D4E5F6","expect":{"lock":"open","why":"fob"},"no_publish":["tap"]},
+        {"at":2000,"tap":"11223344","no_publish":["tap"]},
+        {"at":3000,"broker":true,"no_publish":["tap"]},
+        {"at":3000,"msg":"hub","payload":{"online":true},"publish":[
+          {"topic":"tap","match":{"uid":"04A1B2C3D4E5F6","result":"allow","source":"offline","ts":"2026-11-16T18:00:01.000Z"}},
+          {"topic":"tap","match":{"uid":"11223344","result":"deny","reason":"not_listed","source":"offline"}}]}
+      ]},
+    { "name": "broker up but hub down: taps use the cache, and wait for the hub (nobody would log them)",
+      "steps": [ {"at":0,"broker":true},
+        {"at":1000,"tap":"04A1B2C3D4E5F6","expect":{"lock":"open"},"no_publish":["tap"]},
+        {"at":2000,"msg":"hub","payload":{"online":true},"publish":[{"topic":"tap","match":{"result":"allow","source":"offline","ts":"2026-11-16T18:00:01.000Z"}}]}
+      ]},
+    { "name": "a second tap while open extends the open time from the new tap",
+      "steps": [ {"at":0,"broker":true},{"at":0,"msg":"hub","payload":{"online":true}},
+        {"at":1000,"tap":"04A1B2C3D4E5F6"},
+        {"at":5000,"tap":"04A1B2C3D4E5F6"},
+        {"at":12999,"expect":{"lock":"open"}},
+        {"at":13000,"expect":{"lock":"locked"}}
+      ]},
+    { "name": "a UID that isn't 4, 7 or 10 bytes of hex is ignored",
+      "steps": [ {"at":0,"broker":true},{"at":0,"msg":"hub","payload":{"online":true}},
+        {"at":1000,"tap":"XYZ","no_publish":["tap"],"expect":{"lock":"locked"}}
+      ]}
+  ]
+}

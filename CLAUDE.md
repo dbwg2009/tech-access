@@ -16,15 +16,17 @@ Full brief: `docs/brief.md`. Workbook import/export contract: `docs/workbook-for
 - Hub: TypeScript (strict), Bun, Hono, `bun:sqlite`. Tests with `bun test`.
 - Panel: web UI served by the hub, shown in Chromium kiosk mode on the Pi.
 - Broker: Mosquitto on the Pi.
-- Firmware: PlatformIO + Arduino C++, one firmware for all nodes with per-node config, OTA from the Pi.
+- Firmware: PlatformIO (pioarduino, Arduino-ESP32 3.3.12, pinned) + Arduino C++, one firmware for all nodes with per-node config, OTA from the Pi. Rules in `firmware/lib/box_core`; change `firmware/test/vectors` first, then box_core and `tools/box-sim/core.ts` together.
+- Tests: `bun test` in `hub/` and `tools/box-sim/`; `pio test -e native` in `firmware/`.
 
 ## Layout
 
 ```
-hub/        Bun + Hono app (API, panel UI, importer, MQTT bridge)
+hub/        Bun + Hono app (API, panel UI, importer, MQTT bridge, box firmware store)
 pi/         setup scripts, systemd units, Mosquitto and CA config
-firmware/   PlatformIO project (from week 5)
-docs/       brief, workbook format, decisions
+firmware/   PlatformIO project: lib/box_core (rules, plain C++), src/ (hardware), test/vectors
+tools/      box-sim: simulated boxes (same rules + vectors as the firmware), end-to-end test
+docs/       brief, workbook format, decisions, MQTT contract, wiki
 ```
 
 ## Working with Daniel

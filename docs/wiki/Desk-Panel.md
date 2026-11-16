@@ -1,6 +1,6 @@
 # 9. The desk panel
 
-[← Rebuild and handover](Rebuild-and-Handover.md) · [Home](Home.md)
+[← Rebuild and handover](Rebuild-and-Handover.md) · [Home](Home.md) · Next: [Lock boxes →](Lock-Boxes.md)
 
 The 10.1" touchscreen on the desk, run by the Pi behind it. Crew tap a fob on the reader in
 the side pod to sign in, take and return kit, and open boxes. An **admin fob** (Daniel, Mrs Ritter,
