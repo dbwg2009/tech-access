@@ -9,7 +9,9 @@
 7. [Troubleshooting](Troubleshooting.md)
 8. [Rebuild and handover](Rebuild-and-Handover.md)
 9. [The desk panel](Desk-Panel.md)
+10. [Lock boxes](Lock-Boxes.md)
+11. [Bench test](Bench-Test.md)
 
 ---
 
-[Brief](../brief.md) · [Decisions](../decisions.md) · [Data model](../data-model.md) · [Workbook format](../workbook-format.md)
+[Brief](../brief.md) · [Decisions](../decisions.md) · [Data model](../data-model.md) · [Workbook format](../workbook-format.md) · [MQTT](../mqtt.md)

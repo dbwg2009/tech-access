@@ -24,16 +24,19 @@ path**: if the hub dies mid-show, Eos, QLab and the WING carry on, and the boxes
 | 7 | [Troubleshooting](Troubleshooting.md) | Something's wrong |
 | 8 | [Rebuild and handover](Rebuild-and-Handover.md) | The Pi died; or you're taking this over |
 | 9 | [The desk panel](Desk-Panel.md) | Using the touchscreen, the admin menu, the fob reader; first hardware test |
+| 10 | [Lock boxes](Lock-Boxes.md) | Wiring, parts, adding a box, what boxes do when the Pi is down, firmware updates |
+| 11 | [Bench test](Bench-Test.md) | Checklist for the first box when the parts arrive |
 
-## What exists so far (weeks 1–4)
+## What exists so far (weeks 1–6)
 
 | Built | Coming |
 | --- | --- |
-| Pi hub: NVMe boot, static IP, RTC, chrony, Mosquitto, local CA, hub service | First lock box + OTA (weeks 5–6) |
+| Pi hub: NVMe boot, static IP, RTC, chrony, Mosquitto, local CA, hub service | Native desk panel app (separate piece of work) |
 | Database, workbook import with preview, export | Management USBs: TECHBACKUP, TECHUPDATE, TECHSOFTWARE (week 7) |
 | Access rules (levels, specialisms, day passes, admin, show mode) | Stage Door port + iPad door station (weeks 8–10) |
 | Desk panel: touchscreen kiosk, PN532 fob reader, crew card, admin menu, event log | Nomad agent, kit tags, more boxes (week 11+) |
 | MQTT topics for the boxes ([docs/mqtt.md](../mqtt.md)) | |
+| Lock box firmware (WT32-ETH01), box simulator, OTA updates with rollback ([page 10](Lock-Boxes.md)) | First box on the bench when the parts arrive ([page 11](Bench-Test.md)) |
 
 Imports can be previewed and applied from the panel's admin menu ([page 9](Desk-Panel.md)) or with
 `curl` on the Pi ([page 5](The-Workbook.md)).
