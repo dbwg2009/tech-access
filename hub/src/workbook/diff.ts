@@ -1,4 +1,5 @@
 import type { Database } from "bun:sqlite";
+import { openChanges, type PanelChange } from "../panelChanges";
 import type { Issue, ParsedWorkbook } from "./parse";
 import { SHEETS, type Extra, type RowsBySheet, type SheetKey } from "./schema";
 import { archivedIds, loadRows } from "./store";
@@ -36,8 +37,33 @@ export interface SheetDiff {
   removals: RowRemoval[];
 }
 
+/**
+ * An import that would overwrite or remove a change made on the panel since the last export
+ * (decision 2026-11-16). The admin must choose "panel" (keep the hub's value, the default on
+ * screen) or "sheet" (use the workbook) for each one before apply.
+ */
+export interface Conflict {
+  /** `${sheet}/${id}/${column header}` for a field, `${sheet}/${id}/*` for a removal. */
+  key: string;
+  sheet: SheetKey;
+  sheetName: string;
+  id: string;
+  label: string | null;
+  kind: "change" | "removal";
+  column: string | null;
+  /** Value on the hub now (set on the panel). For a removal, null. */
+  panel: string | number | null;
+  /** Value in the workbook. For a removal, null (the row is missing). */
+  sheetValue: string | number | null;
+  changedAt: string;
+  byFob: string;
+}
+
+export type Resolution = "panel" | "sheet";
+
 export interface Diff {
   sheets: Record<SheetKey, SheetDiff>;
+  conflicts: Conflict[];
   counts: Record<SheetKey, { adds: number; changes: number; removals: number }>;
   errors: Issue[];
   warnings: Issue[];
@@ -66,13 +92,14 @@ function compare(def: (typeof SHEETS)[number], oldRow: Row, newRow: Row): FieldC
 
 /** Compare a parsed workbook with the DB. Rows missing from the file are removals. Pure read. */
 export function diff(parsed: ParsedWorkbook, db: Database): Diff {
-  return diffRows(parsed, loadRows(db), (k) => archivedIds(db, k));
+  return diffRows(parsed, loadRows(db), (k) => archivedIds(db, k), openChanges(db));
 }
 
 export function diffRows(
   parsed: ParsedWorkbook,
   current: RowsBySheet,
   archived: (k: SheetKey) => Set<string>,
+  panelChanges: PanelChange[] = [],
 ): Diff {
   const sheets = {} as Record<SheetKey, SheetDiff>;
   const counts = {} as Diff["counts"];
@@ -123,5 +150,58 @@ export function diffRows(
     }
   }
   const empty = Object.values(counts).every((c) => c.adds + c.changes + c.removals === 0);
-  return { sheets, counts, errors: parsed.errors, warnings, empty };
+  return { sheets, conflicts: findConflicts(sheets, panelChanges, current), counts, errors: parsed.errors, warnings, empty };
+}
+
+function findConflicts(sheets: Record<SheetKey, SheetDiff>, changes: PanelChange[], current: RowsBySheet): Conflict[] {
+  if (!changes.length) return [];
+  const out: Conflict[] = [];
+  for (const def of SHEETS) {
+    const mine = changes.filter((c) => c.sheet === def.key);
+    if (!mine.length) continue;
+    const label = (id: string) => {
+      const row = (current[def.key] as unknown as Record<string, unknown>[]).find((r) => r[def.idField] === id);
+      return row ? (norm(row[def.labelField]) as string | null) : null;
+    };
+    const latest = (hits: PanelChange[]) => hits[hits.length - 1]!;
+    for (const ch of sheets[def.key].changes) {
+      for (const f of ch.fields) {
+        const col = def.columns.find((c) => c.header === f.column);
+        if (!col) continue; // extra columns are never changed on the panel
+        const hits = mine.filter((c) => c.row_id === ch.id && (c.field === col.field || c.field === "*"));
+        if (!hits.length) continue;
+        out.push({
+          key: `${def.key}/${ch.id}/${f.column}`,
+          sheet: def.key,
+          sheetName: def.name,
+          id: ch.id,
+          label: label(ch.id),
+          kind: "change",
+          column: f.column,
+          panel: f.old,
+          sheetValue: f.new,
+          changedAt: latest(hits).ts,
+          byFob: latest(hits).fob_uid,
+        });
+      }
+    }
+    for (const r of sheets[def.key].removals) {
+      const hits = mine.filter((c) => c.row_id === r.id);
+      if (!hits.length) continue;
+      out.push({
+        key: `${def.key}/${r.id}/*`,
+        sheet: def.key,
+        sheetName: def.name,
+        id: r.id,
+        label: r.label,
+        kind: "removal",
+        column: null,
+        panel: null,
+        sheetValue: null,
+        changedAt: latest(hits).ts,
+        byFob: latest(hits).fob_uid,
+      });
+    }
+  }
+  return out;
 }

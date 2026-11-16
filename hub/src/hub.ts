@@ -5,6 +5,7 @@ import { createApp } from "./app";
 import type { Config } from "./config";
 import type { Bus } from "./mqtt/bus";
 import { BoxLink } from "./mqtt/boxes";
+import { Admin, type Runner } from "./panel/admin";
 import { Panel, type PanelTimings } from "./panel/panel";
 import { PanelStream } from "./panel/stream";
 import type { FobReader } from "./reader/types";
@@ -19,6 +20,10 @@ export interface HubDeps {
   timings?: Partial<PanelTimings>;
   system?: () => SystemInfo;
   startedAt?: number;
+  /** Runs restart / reboot commands. Tests pass a fake. */
+  run?: Runner;
+  /** Where Backup now writes. Default: backups/ next to the database. */
+  backupDir?: string | null;
 }
 
 export function buildHub(d: HubDeps) {
@@ -46,12 +51,14 @@ export function buildHub(d: HubDeps) {
     panel.overviewChanged();
   };
 
-  const app = createApp({ db: d.db, config: d.config, now, startedAt, reader: d.reader, panel, onDataChanged: dataChanged });
+  const admin = new Admin(panel, { run: d.run, backupDir: d.backupDir, onDataChanged: () => boxes.publishRetained() });
+  const app = createApp({ db: d.db, config: d.config, now, startedAt, reader: d.reader, panel, admin, onDataChanged: dataChanged });
 
   let timers: ReturnType<typeof setInterval>[] = [];
   return {
     app,
     panel,
+    admin,
     boxes,
     stream,
     dataChanged,

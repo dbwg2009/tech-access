@@ -1,6 +1,7 @@
 import type { Database } from "bun:sqlite";
 import { adminCheck } from "../access";
-import { diff, diffRows, type Diff } from "./diff";
+import { markResolved, openChanges } from "../panelChanges";
+import { diff, diffRows, type Diff, type Resolution } from "./diff";
 import { localDate, normaliseUid } from "./normalise";
 import { parseWorkbook, type ParsedWorkbook } from "./parse";
 import { SHEETS, type Fob, type Person, type SheetKey } from "./schema";
@@ -13,6 +14,8 @@ export interface Preview {
   fileHash: string;
   uploadedAt: string;
   canApply: boolean;
+  /** Conflicts with panel changes; each needs a choice before apply. */
+  conflictCount: number;
   diff: Diff;
 }
 
@@ -42,6 +45,7 @@ function toPreview(b: BatchRow): Preview {
     fileHash: b.file_hash,
     uploadedAt: b.uploaded_at,
     canApply: b.status === "pending" && d.errors.length === 0,
+    conflictCount: (d.conflicts ?? []).length,
     diff: d,
   };
 }
@@ -75,6 +79,7 @@ export type ApplyResult =
   | { kind: "superseded" }
   | { kind: "has_errors"; errorCount: number }
   | { kind: "stale" }
+  | { kind: "unresolved"; keys: string[] }
   | { kind: "forbidden"; reason: string };
 
 /**
@@ -109,7 +114,14 @@ function authorise(
 }
 
 /** Apply a pending batch in one transaction. Idempotent: a second apply of the same batch is a no-op. */
-export function applyBatch(db: Database, batchId: number, rawFobUid: string, now = new Date(), timezone = "Europe/London"): ApplyResult {
+export function applyBatch(
+  db: Database,
+  batchId: number,
+  rawFobUid: string,
+  now = new Date(),
+  timezone = "Europe/London",
+  resolutions: Record<string, Resolution> = {},
+): ApplyResult {
   const uid = normaliseUid(rawFobUid);
   if (!uid.ok) return { kind: "forbidden", reason: `Bad fob UID: ${uid.error}` };
   const ts = now.toISOString();
@@ -124,11 +136,38 @@ export function applyBatch(db: Database, batchId: number, rawFobUid: string, now
 
     const parsed = JSON.parse(b.parsed) as ParsedWorkbook;
     const preview = JSON.parse(b.preview) as Diff;
-    const fresh = diffRows(parsed, loadRows(db), (k) => archivedIds(db, k));
-    if (JSON.stringify(fresh.sheets) !== JSON.stringify(preview.sheets)) return { kind: "stale" };
+    const current = loadRows(db);
+    const fresh = diffRows(parsed, current, (k) => archivedIds(db, k), openChanges(db));
+    if (
+      JSON.stringify(fresh.sheets) !== JSON.stringify(preview.sheets) ||
+      JSON.stringify(fresh.conflicts) !== JSON.stringify(preview.conflicts ?? [])
+    ) {
+      return { kind: "stale" };
+    }
 
     const auth = authorise(db, parsed, uid.value);
     if (!auth.ok) return { kind: "forbidden", reason: auth.reason };
+
+    // Panel changes since the last export: every conflict needs an explicit choice.
+    const unresolved = fresh.conflicts.filter((c) => resolutions[c.key] !== "panel" && resolutions[c.key] !== "sheet").map((c) => c.key);
+    if (unresolved.length) return { kind: "unresolved", keys: unresolved };
+    const keepRemovals = new Set<string>();
+    for (const c of fresh.conflicts) {
+      const def = SHEETS.find((d) => d.key === c.sheet)!;
+      if (resolutions[c.key] === "sheet") {
+        markResolved(db, c.sheet, c.id, c.kind === "removal" ? null : def.columns.find((x) => x.header === c.column)!.field, ts);
+        continue;
+      }
+      // "panel": keep the hub's value.
+      if (c.kind === "removal") {
+        keepRemovals.add(`${c.sheet}/${c.id}`);
+        continue;
+      }
+      const field = def.columns.find((x) => x.header === c.column)!.field;
+      const row = (parsed.rows[c.sheet] as unknown as Record<string, unknown>[]).find((r) => r[def.idField] === c.id);
+      const cur = (current[c.sheet] as unknown as Record<string, unknown>[]).find((r) => r[def.idField] === c.id);
+      if (row && cur) row[field] = cur[field];
+    }
 
     // Parents before children, then archive children before parents.
     const order: SheetKey[] = ["boxes", "people", "kit", "fobs"];
@@ -140,7 +179,7 @@ export function applyBatch(db: Database, batchId: number, rawFobUid: string, now
       }
     }
     for (const key of [...order].reverse()) {
-      for (const r of fresh.sheets[key].removals) archiveRow(db, key, r.id, ts, today);
+      for (const r of fresh.sheets[key].removals) if (!keepRemovals.has(`${key}/${r.id}`)) archiveRow(db, key, r.id, ts, today);
     }
 
     const setting = db.query(
@@ -157,7 +196,7 @@ export function applyBatch(db: Database, batchId: number, rawFobUid: string, now
         ts,
         auth.fob.person_id,
         uid.value,
-        JSON.stringify({ batchId, fileHash: b.file_hash, fileName: b.file_name, counts: fresh.counts, bootstrap: auth.bootstrap }),
+        JSON.stringify({ batchId, fileHash: b.file_hash, fileName: b.file_name, counts: fresh.counts, bootstrap: auth.bootstrap, resolutions }),
       )!;
     db.query("UPDATE import_batches SET status = 'applied', applied_by_fob_uid = ?, applied_at = ? WHERE id = ?").run(
       uid.value,

@@ -112,7 +112,7 @@ export class Panel {
   private screenOn = true;
   private lastActivity: number;
   private readonly confirmers = new Map<string, Confirmer>();
-  private captureFn: ((s: Session, uid: string) => void) | null = null;
+  private captureFn: ((s: Session, uid: string, purpose: Capture["purpose"]) => void) | null = null;
 
   constructor(d: PanelDeps) {
     this.db = d.db;
@@ -154,9 +154,10 @@ export class Panel {
     if (s?.pending && now < s.pending.expiresAt) return this.confirmTap(s, s.pending, uid);
     if (s?.capture && now < s.capture.expiresAt && this.captureFn) {
       const fn = this.captureFn;
+      const purpose = s.capture.purpose;
       s.capture = null;
       s.lastTouch = now;
-      return fn(s, uid);
+      return fn(s, uid, purpose);
     }
     this.openFor(uid);
   }
@@ -256,7 +257,7 @@ export class Panel {
     this.confirmers.set(action, fn);
   }
 
-  setCaptureHandler(fn: (s: Session, uid: string) => void): void {
+  setCaptureHandler(fn: (s: Session, uid: string, purpose: Capture["purpose"]) => void): void {
     this.captureFn = fn;
   }
 

@@ -4,7 +4,9 @@ import { extname, resolve, sep } from "node:path";
 import type { Config } from "./config";
 import { schemaVersion } from "./db";
 import type { FobReader } from "./reader/types";
+import type { Admin } from "./panel/admin";
 import type { Panel } from "./panel/panel";
+import { adminRoutes } from "./routes/admin";
 import { devRoutes } from "./routes/dev";
 import { panelRoutes } from "./routes/panel";
 import { importRoutes } from "./routes/import";
@@ -19,6 +21,7 @@ export interface AppDeps {
   reader?: FobReader;
   /** Desk panel (sessions, crew and admin actions). Optional for import-only tests. */
   panel?: Panel;
+  admin?: Admin;
   /** Called after an import is applied, so box allowlists and the panel refresh. */
   onDataChanged?: () => void;
 }
@@ -33,7 +36,7 @@ const TYPES: Record<string, string> = {
   ".woff2": "font/woff2",
 };
 
-export function createApp({ db, config, startedAt = Date.now(), now = () => new Date(), reader, panel, onDataChanged }: AppDeps) {
+export function createApp({ db, config, startedAt = Date.now(), now = () => new Date(), reader, panel, admin, onDataChanged }: AppDeps) {
   const app = new Hono();
 
   app.get("/api/health", (c) => {
@@ -64,6 +67,7 @@ export function createApp({ db, config, startedAt = Date.now(), now = () => new 
   app.route("/api", importRoutes(db, config, now, onDataChanged));
   app.route("/api", devRoutes(reader));
   if (panel) app.route("/api", panelRoutes(panel, { fakeReader: config.fakeReader }));
+  if (panel && admin) app.route("/api", adminRoutes(panel, admin));
   app.all("/api/*", (c) => c.json({ error: "Not found" }, 404));
 
   // Local static files only. No CDN.

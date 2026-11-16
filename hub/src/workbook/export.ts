@@ -2,6 +2,7 @@ import type { Database } from "bun:sqlite";
 import * as XLSX from "xlsx";
 import { dateToSerial } from "./normalise";
 import { DEFAULT_README, README_SHEET, SHEETS, WORKBOOK_SCHEMA_VERSION, type SheetKey } from "./schema";
+import { markExported } from "../panelChanges";
 import { loadRows } from "./store";
 
 type CellOut = XLSX.CellObject | null;
@@ -116,9 +117,11 @@ export function exportWorkbook(db: Database, now = new Date()): Uint8Array {
     XLSX.utils.book_append_sheet(wb, ws, def.name);
   }
 
+  // Everything changed on the panel up to now is in this file (decision 2026-11-16).
+  const exported = markExported(db, now.toISOString());
   db.query("INSERT INTO events (ts, type, detail) VALUES (?, 'export', ?)").run(
     now.toISOString(),
-    JSON.stringify({ counts: Object.fromEntries(SHEETS.map((d) => [d.key, data[d.key].length])) }),
+    JSON.stringify({ counts: Object.fromEntries(SHEETS.map((d) => [d.key, data[d.key].length])), panelChangesExported: exported }),
   );
   return XLSX.write(wb, { type: "buffer", bookType: "xlsx", compression: true }) as Uint8Array;
 }

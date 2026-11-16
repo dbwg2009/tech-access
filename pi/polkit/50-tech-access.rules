@@ -1,0 +1,27 @@
+// tech-access: let the hub's service user restart the hub and reboot the Pi from the desk
+// panel's admin menu, and nothing else. Installed to /etc/polkit-1/rules.d/ by 07-reader.sh.
+// The hub runs with NoNewPrivileges=yes, so sudo is out; systemctl asks systemd / logind over
+// D-Bus and they ask polkit, which reads this file.
+//
+// Allowed, for the hub user only (@HUB_USER@ is filled from pi/config.env, normally techaccess):
+//   systemctl --no-ask-password restart tech-access-hub.service
+//   systemctl --no-ask-password reboot
+// Everything else falls through to the normal rules (i.e. refused for a system user).
+polkit.addRule(function (action, subject) {
+  if (subject.user !== "@HUB_USER@") return polkit.Result.NOT_HANDLED;
+
+  if (action.id === "org.freedesktop.systemd1.manage-units" &&
+      action.lookup("unit") === "tech-access-hub.service" &&
+      action.lookup("verb") === "restart") {
+    return polkit.Result.YES;
+  }
+
+  // logind asks for "reboot-multiple-sessions" when someone else is logged in (the kiosk user
+  // always is, on tty1), so both are needed. Not "-ignore-inhibit": inhibitors still apply.
+  if (action.id === "org.freedesktop.login1.reboot" ||
+      action.id === "org.freedesktop.login1.reboot-multiple-sessions") {
+    return polkit.Result.YES;
+  }
+
+  return polkit.Result.NOT_HANDLED;
+});
