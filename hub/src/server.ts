@@ -3,6 +3,8 @@ import { loadConfig } from "./config";
 import { openDb } from "./db";
 import { migrate } from "./migrate";
 import { FakeReader } from "./reader/fake";
+import { Pn532UartReader } from "./reader/pn532Reader";
+import { UartTransport } from "./reader/uart";
 import type { FobReader } from "./reader/types";
 import { VERSION } from "./version";
 
@@ -10,17 +12,19 @@ const config = loadConfig();
 const db = openDb(config.dbPath);
 const applied = migrate(db);
 if (applied.length) console.log(`applied migrations: ${applied.join(", ")}`);
-// Desk fob reader. Step 1 (weeks 3-4): fake reader for development; the PN532 UART transport
-// is added once the serial approach is agreed.
-let reader: FobReader | undefined;
+// Desk fob reader: the PN532 on the Pi's UART, or the fake reader in development. Either way a
+// missing or broken reader only shows in /api/health; the hub carries on.
+let reader: FobReader;
 if (config.fakeReader) {
   reader = new FakeReader(config.fakeFobs);
   console.log("fob reader: FAKE (development). Tap with POST /api/dev/tap");
+} else {
+  reader = new Pn532UartReader(new UartTransport(config.readerDevice));
 }
-reader?.on("tap", (t) => console.log(`tap ${t.uid}`));
-reader?.on("status", (s) => console.log(`fob reader: ${s.detail}`));
-reader?.on("error", (e) => console.error(`fob reader: ${e.message}`));
-reader?.start();
+reader.on("tap", (t) => console.log(`tap ${t.uid}`));
+reader.on("status", (s) => console.log(`fob reader: ${s.detail}${s.firmware ? ` (${s.firmware})` : ""}`));
+reader.on("error", (e) => console.error(`fob reader: ${e.message}`));
+reader.start();
 
 const app = createApp({ db, config, reader });
 
@@ -30,7 +34,7 @@ console.log(`tech-access hub ${VERSION} on http://${server.hostname}:${server.po
 for (const sig of ["SIGINT", "SIGTERM"] as const) {
   process.on(sig, () => {
     server.stop();
-    void reader?.stop();
+    void reader.stop();
     db.close();
     process.exit(0);
   });
