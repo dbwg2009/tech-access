@@ -4,7 +4,8 @@
 #   ](Page.md#x)     -> ](Page#x)                 (wiki pages have no .md)
 #   ](../../path)    -> ](BLOB_BASE/path)         (repo files, from docs/wiki)
 #   ](../path)       -> ](BLOB_BASE/docs/path)
-# Pages deleted from SRC_DIR are deleted from the wiki. Prints what changed.
+# Also copies SRC_DIR/images/ (screenshots) as-is. Pages deleted from SRC_DIR are deleted from
+# the wiki. Prints what changed.
 set -euo pipefail
 src=$1 wiki=$2 base=$3
 
@@ -16,5 +17,6 @@ for f in "$src"/*.md; do
     -e 's|\]\(([A-Za-z0-9_-]+)\.md(#[^)]*)?\)|](\1\2)|g' \
     "$f" > "$wiki/$(basename "$f")"
 done
+if [[ -d $src/images ]]; then cp -R "$src/images" "$wiki/images"; fi
 git -C "$wiki" add -A
 git -C "$wiki" status --short

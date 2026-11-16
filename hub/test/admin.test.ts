@@ -453,3 +453,15 @@ describe("import vs panel changes (round trips)", () => {
     expect(ev).toMatchObject({ fob_uid: UID.ritterAdmin, detail: { resolutions: res } });
   });
 });
+
+describe("event log wording for admin actions", () => {
+  test("names the admin who acted and the person it was about", async () => {
+    const h = setup();
+    const s = admin(h, UID.ritterAdmin);
+    await h.req("POST", "/api/admin/fob-status", { session: s, uid: UID.cal, status: "Lost" });
+    h.tap(UID.danielAdmin);
+    await h.req("POST", "/api/admin/enrol", { session: s, uid: "01020304", personId: "P001" });
+    const texts = (await h.req("GET", `/api/admin/events?session=${s}`)).json.events.map((e: { text: string }) => e.text);
+    expect(texts).toEqual(["Mrs Ritter enrolled a fob for Ada", "Mrs Ritter marked Cal's fob lost (confirmed by Daniel)"]);
+  });
+});

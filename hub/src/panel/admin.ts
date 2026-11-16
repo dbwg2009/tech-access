@@ -127,7 +127,7 @@ export class Admin {
         const p = f.person_id ? people.get(f.person_id) : undefined;
         return {
           fob_uid: f.fob_uid,
-          name: p ? firstName(p.name) : f.role === "Day pass" ? "Guest" : "Nobody",
+          name: p ? firstName(p.name) : f.role === "Day pass" ? "Day pass" : "Spare fob",
           person_id: f.person_id,
           role: f.role,
           status: f.status,
@@ -543,20 +543,21 @@ export class Admin {
   }
 }
 
-const ACTION_WORDS: Record<string, string> = {
-  students_disabled: "disabled all students",
-  students_enabled: "re-enabled students",
-  fob_lost: "marked a fob lost",
-  fob_revoked: "revoked a fob",
-  fob_enrolled: "enrolled a fob",
-  day_pass_issued: "issued a day pass",
-  show_mode_on: "turned show mode on",
-  show_mode_off: "turned show mode off",
-  force_return: "force-returned",
-  end_of_session: "ended the session",
-  backup: "made a backup",
-  restart_hub: "restarted the hub",
-  reboot_pi: "rebooted the Pi",
+/** What an admin did. `subject` = the event's person (whose fob, who the fob went to). */
+const ACTION_WORDS: Record<string, (subject: string | null, kit: string | null, d: Record<string, unknown>) => string> = {
+  students_disabled: () => "disabled all students",
+  students_enabled: () => "re-enabled students",
+  fob_lost: (who) => `marked ${who ? `${who}'s` : "a spare"} fob lost`,
+  fob_revoked: (who) => `revoked ${who ? `${who}'s` : "a spare"} fob`,
+  fob_enrolled: (who) => `enrolled a fob for ${who ?? "someone"}`,
+  day_pass_issued: (_w, _k, d) => `issued a day pass (${String(d.guest ?? "guest")}, Level ${String(d.level ?? 1)})`,
+  show_mode_on: () => "turned show mode on",
+  show_mode_off: () => "turned show mode off",
+  force_return: (_w, kit) => `force-returned ${kit ?? "an item"}`,
+  end_of_session: () => "ended the session",
+  backup: () => "made a backup",
+  restart_hub: () => "restarted the hub",
+  reboot_pi: () => "rebooted the Pi",
 };
 
 /** One plain line per event for the log screen. */
@@ -588,9 +589,11 @@ export function describe(
     case "tap_denied":
       return `Panel refused ${w}${reason}`;
     case "admin_action": {
-      const what = ACTION_WORDS[d.action as string] ?? String(d.action);
+      const actor = fobName(d.openedBy) ?? w;
+      const fn = ACTION_WORDS[d.action as string];
+      const what = fn ? fn(who, kit, d) : String(d.action);
       const conf = d.confirmedBy && d.confirmedBy !== d.openedBy ? ` (confirmed by ${fobName(d.confirmedBy)})` : "";
-      return `${w} ${what}${kit ? ` ${kit}` : ""}${conf}`;
+      return `${actor} ${what}${conf}`;
     }
     case "import_applied":
       return `${w} applied a workbook`;

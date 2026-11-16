@@ -1,5 +1,6 @@
 import type { Database } from "bun:sqlite";
 import { adminCheck } from "../access";
+import { firstName } from "../names";
 import { markResolved, openChanges } from "../panelChanges";
 import { diff, diffRows, type Diff, type Resolution } from "./diff";
 import { localDate, normaliseUid } from "./normalise";
@@ -16,6 +17,8 @@ export interface Preview {
   canApply: boolean;
   /** Conflicts with panel changes; each needs a choice before apply. */
   conflictCount: number;
+  /** First names for Person IDs that appear in conflicts (display only). */
+  names: Record<string, string>;
   diff: Diff;
 }
 
@@ -36,8 +39,15 @@ export function sha256(buf: Uint8Array): string {
   return new Bun.CryptoHasher("sha256").update(buf).digest("hex");
 }
 
-function toPreview(b: BatchRow): Preview {
+function toPreview(db: Database, b: BatchRow): Preview {
   const d = JSON.parse(b.preview) as Diff;
+  const names: Record<string, string> = {};
+  for (const c of d.conflicts ?? []) {
+    const pid = c.sheet === "people" ? c.id : c.sheet === "fobs" ? c.label : null;
+    if (!pid) continue;
+    const n = db.query<{ name: string }, [string]>("SELECT name FROM people WHERE person_id = ?").get(pid)?.name;
+    if (n) names[pid] = firstName(n);
+  }
   return {
     batchId: b.id,
     status: b.status,
@@ -46,6 +56,7 @@ function toPreview(b: BatchRow): Preview {
     uploadedAt: b.uploaded_at,
     canApply: b.status === "pending" && d.errors.length === 0,
     conflictCount: (d.conflicts ?? []).length,
+    names,
     diff: d,
   };
 }
@@ -64,12 +75,12 @@ export function createBatch(db: Database, file: Uint8Array, fileName: string | n
       )
       .get(sha256(file), fileName, ts, JSON.stringify(parsed), JSON.stringify(d), d.errors.length)!;
   })();
-  return toPreview(row);
+  return toPreview(db, row);
 }
 
 export function getBatch(db: Database, id: number): Preview | null {
   const b = db.query<BatchRow, [number]>("SELECT * FROM import_batches WHERE id = ?").get(id);
-  return b ? toPreview(b) : null;
+  return b ? toPreview(db, b) : null;
 }
 
 export type ApplyResult =

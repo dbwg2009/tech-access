@@ -4,10 +4,11 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "build": "bun run scripts/build-panel.ts",
     "start": "bun run src/server.ts",
-    "dev": "bun --watch run src/server.ts",
+    "dev": "bun run build && bun --watch run src/server.ts",
     "test": "bun test",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit && tsc --noEmit -p panel"
   },
   "dependencies": {
     "hono": "4.13.18",

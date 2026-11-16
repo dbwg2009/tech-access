@@ -54,6 +54,15 @@ if [[ -f $stamp && $(cat "$stamp") == "$lockhash" ]]; then ok "node_modules matc
   changed "bun install --frozen-lockfile --production"
 fi
 
+say "Desk panel (hub/panel -> hub/public/panel, built here, not committed)"
+head=$(git -C "$INSTALL_DIR" rev-parse HEAD)
+pstamp="$INSTALL_DIR/hub/public/panel/.built-from"
+if [[ -f $pstamp && $(cat "$pstamp") == "$head" && -f $INSTALL_DIR/hub/public/panel/app.js ]]; then ok "panel built for ${head:0:7}"; else
+  (cd "$INSTALL_DIR/hub" && bun run build)
+  echo "$head" > "$pstamp"
+  changed "built the desk panel for ${head:0:7}"
+fi
+
 say "Hub config $ETC_DIR/hub.toml"
 write_file "$ETC_DIR/hub.toml" 0644 root:root <<TOML
 # Written by 05-bun-hub.sh from pi/config.env. Edit config.env and re-run, not this file.
@@ -64,6 +73,8 @@ mqtt_url = "mqtt://127.0.0.1:$MQTT_PORT"
 mqtt_username = "hub"
 usb_mount_root = "/media"
 timezone = "$TIMEZONE"
+reader_device = "$READER_DEVICE"
+fake_reader = false
 TOML
 
 say "systemd unit"
